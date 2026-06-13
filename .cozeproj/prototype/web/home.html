@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 字体：Nunito（圆润现代无衬线）+ Noto Sans SC（中文） -->
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/css2?family=Nunito:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色 === */
+      --color-primary:              #5B6CFF;
+      --color-primary-container:    #E0E3FF;
+      --color-on-primary:           #ffffff;
+      /* === 背景 / 表面 === */
+      --color-background:                 #F7F8FF;
+      --color-surface-container-lowest:   #FFFFFF;
+      --color-surface:                    #FFFFFF;
+      --color-surface-container:          #EEF0FF;
+      --color-surface-container-high:     #E4E6F7;
+      --color-surface-container-highest:  #D8DBF0;
+      /* === 文字 === */
+      --color-on-surface:           #1F2433;
+      --color-on-surface-variant:   #6B7294;
+      /* === 功能色 === */
+      --color-success:  #55C59D;
+      --color-error:    #EF4444;
+      --color-warning:  #FFD166;
+      /* === 装饰色（教育风活力色） === */
+      --color-accent-yellow:  #FFD166;
+      --color-accent-pink:    #FF7AB6;
+      --color-accent-green:   #55C59D;
+      /* === 边框 === */
+      --color-outline:          #C7CADB;
+      --color-outline-variant:  #E0E2EF;
+      /* === 圆角 === */
+      --radius-sm:   0.375rem;
+      --radius-md:   0.5rem;
+      --radius-lg:   0.75rem;
+      --radius-xl:   1rem;
+      --radius-2xl:  1.5rem;
+      --radius-full: 9999px;
+      /* === 阴影 === */
+      --shadow-card:   0 2px 8px rgba(0,0,0,0.08);
+      --shadow-float:  0 10px 25px rgba(0,0,0,0.10);
+      --shadow-dialog: 0 25px 50px rgba(0,0,0,0.12);
+      /* === 字体 === */
+      --font-sans: "Nunito", "Noto Sans SC", system-ui, sans-serif;
+    }
+  </style>
+
+  <!-- 图片兜底 -->
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239ca3af" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- @nav:start 导航组件 -->
+  <header class="bg-surface sticky top-0 z-40 shadow-card">
+    <div class="max-w-6xl mx-auto h-16 flex items-center justify-between px-6">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+          <i data-lucide="code" class="w-5 h-5 text-on-primary"></i>
+        </div>
+        <span class="font-bold text-lg text-on-surface">码上成长</span>
+        <span class="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full ml-1">Python 评价助手</span>
+      </div>
+      <nav class="flex items-center gap-1">
+        <a href="home.html" class="nav-link px-4 py-2 text-sm font-semibold text-primary bg-primary/10 rounded-lg transition-colors flex items-center gap-1.5" aria-current="page">
+          <i data-lucide="message-square-code" class="w-4 h-4"></i>代码评价
+        </a>
+        <a href="statistics.html" class="nav-link px-4 py-2 text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors flex items-center gap-1.5">
+          <i data-lucide="bar-chart" class="w-4 h-4"></i>学情统计
+        </a>
+      </nav>
+    </div>
+  </header>
+  <!-- @nav:end 导航组件 -->
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <!-- @main-content:start -->
+
+    <!-- 左右两栏布局 -->
+    <div class="flex gap-6 items-start">
+
+      <!-- ========== 左栏 - 输入区域 ========== -->
+      <div class="w-[40%] shrink-0 space-y-6">
+
+        <!-- 欢迎语 -->
+        <div>
+          <h1 class="text-2xl font-bold text-on-surface">提交你的代码，让AI帮你诊断成长方向</h1>
+        </div>
+
+        <!-- 表单卡片 -->
+        <div class="bg-surface rounded-xl shadow-card p-5 space-y-5">
+
+          <!-- 学生姓名 -->
+          <div class="space-y-1.5">
+            <label for="input-name" class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-primary"></i>学生姓名
+            </label>
+            <input id="input-name" type="text" placeholder="请输入你的姓名"
+                   class="w-full bg-surface-container border-none rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors" />
+          </div>
+
+          <!-- 题目内容 -->
+          <div class="space-y-1.5">
+            <label for="input-question" class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-primary"></i>题目内容
+            </label>
+            <textarea id="input-question" rows="5" placeholder="请粘贴你的题目要求"
+                      class="w-full bg-surface-container border-none rounded-md px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors resize-none"></textarea>
+          </div>
+
+          <!-- Python代码 -->
+          <div class="space-y-1.5">
+            <label for="input-code" class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+              <i data-lucide="terminal" class="w-3.5 h-3.5 text-primary"></i>Python 代码
+            </label>
+            <textarea id="input-code" rows="10" placeholder="# 在这里粘贴你的Python代码"
+                      class="w-full bg-[#1E1E2E] border-none rounded-lg px-4 py-3 text-sm text-[#CDD6F4] placeholder:text-[#6C7086] focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors resize-none font-mono leading-relaxed"></textarea>
+          </div>
+
+          <!-- 提交按钮区域 -->
+          <div class="flex items-center gap-4 pt-1">
+            <button id="btn-submit"
+                    class="bg-primary text-on-primary px-5 py-2.5 rounded-lg text-sm font-semibold hover:opacity-90 active:scale-[0.98] transition-all inline-flex items-center gap-2 shadow-float">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>开始评价
+            </button>
+            <span class="text-xs text-on-surface-variant">AI将从4个维度评估你的代码</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 右栏 - 评价报告区域 ========== -->
+      <div class="flex-1 min-w-0">
+
+        <!-- 初始状态 - 引导卡片 -->
+        <div id="report-placeholder" class="bg-surface rounded-xl shadow-card p-12 flex flex-col items-center justify-center text-center min-h-[600px]">
+          <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-5">
+            <i data-lucide="clipboard-check" class="w-8 h-8 text-primary"></i>
+          </div>
+          <h3 class="text-base font-semibold text-on-surface mb-2">提交代码后，评价报告将在这里展示</h3>
+          <p class="text-sm text-on-surface-variant max-w-xs">在左侧填写信息并点击"开始评价"，AI将为你生成详细的代码诊断报告</p>
+        </div>
+
+        <!-- 评价报告内容（Mock数据展示完整报告） -->
+        <div id="report-content" class="space-y-5 hidden">
+
+          <!-- 报告标题区域 -->
+          <div class="bg-surface rounded-xl shadow-card p-5">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <i data-lucide="user" class="w-5 h-5 text-primary"></i>
+              </div>
+              <div>
+                <p class="text-xs text-on-surface-variant">评价报告</p>
+                <h2 id="report-student-name" class="text-lg font-bold text-on-surface">李明</h2>
+              </div>
+            </div>
+            <!-- 装饰分隔线 -->
+            <div class="mt-4 h-1 rounded-full bg-gradient-to-r from-accent-yellow via-accent-green to-accent-pink opacity-60"></div>
+          </div>
+
+          <!-- 四大维度评分卡片 -->
+
+          <!-- 维度1 - 题目理解与实现 - 黄色竖条 -->
+          <div class="bg-surface rounded-xl shadow-card p-5 flex gap-4 border-l-4 border-accent-yellow">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+                  <i data-lucide="target" class="w-4 h-4 text-accent-yellow"></i>题目理解与实现
+                </h3>
+                <span class="text-base font-bold text-on-surface">22<span class="text-on-surface-variant font-normal text-sm">/30分</span></span>
+              </div>
+              <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden mb-3">
+                <div class="h-full rounded-full bg-accent-yellow" style="width: 73.3%"></div>
+              </div>
+              <p class="text-sm text-on-surface-variant leading-relaxed">代码整体思路符合题目要求，函数结构正确，能遍历列表并累加。注意：第4行有一处语法问题影响了运行，其他逻辑是对的！</p>
+            </div>
+          </div>
+
+          <!-- 维度2 - 逻辑思路 - 绿色竖条 -->
+          <div class="bg-surface rounded-xl shadow-card p-5 flex gap-4 border-l-4 border-accent-green">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+                  <i data-lucide="brain" class="w-4 h-4 text-accent-green"></i>逻辑思路
+                </h3>
+                <span class="text-base font-bold text-on-surface">22<span class="text-on-surface-variant font-normal text-sm">/25分</span></span>
+              </div>
+              <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden mb-3">
+                <div class="h-full rounded-full bg-accent-green" style="width: 88%"></div>
+              </div>
+              <p class="text-sm text-on-surface-variant leading-relaxed">用for循环遍历列表、用if判断偶数、用累加器统计，思路完全正确👍 只是判断条件的写法需要注意一下。</p>
+            </div>
+          </div>
+
+          <!-- 维度3 - 代码可读性 - 蓝色竖条 -->
+          <div class="bg-surface rounded-xl shadow-card p-5 flex gap-4 border-l-4 border-primary">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+                  <i data-lucide="eye" class="w-4 h-4 text-primary"></i>代码可读性
+                </h3>
+                <span class="text-base font-bold text-on-surface">21<span class="text-on-surface-variant font-normal text-sm">/25分</span></span>
+              </div>
+              <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden mb-3">
+                <div class="h-full rounded-full bg-primary" style="width: 84%"></div>
+              </div>
+              <p class="text-sm text-on-surface-variant leading-relaxed">变量命名total/lst有实际含义，缩进统一，结构清晰。建议：可以在函数定义下方加一行注释说明这个函数的功能。</p>
+            </div>
+          </div>
+
+          <!-- 维度4 - 语法掌握 - 粉色竖条 -->
+          <div class="bg-surface rounded-xl shadow-card p-5 flex gap-4 border-l-4 border-accent-pink">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+                  <i data-lucide="code" class="w-4 h-4 text-accent-pink"></i>语法掌握
+                </h3>
+                <span class="text-base font-bold text-on-surface">14<span class="text-on-surface-variant font-normal text-sm">/20分</span></span>
+              </div>
+              <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden mb-3">
+                <div class="h-full rounded-full bg-accent-pink" style="width: 70%"></div>
+              </div>
+              <p class="text-sm text-on-surface-variant leading-relaxed">发现1处语法错误，其余语法使用正确。</p>
+            </div>
+          </div>
+
+          <!-- 总分区域 -->
+          <div class="bg-surface rounded-xl shadow-card p-5">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-semibold text-on-surface flex items-center gap-1.5">
+                <i data-lucide="trophy" class="w-4 h-4 text-accent-yellow"></i>综合评分
+              </h3>
+              <div class="flex items-center gap-2">
+                <span class="text-2xl font-bold text-on-surface">79<span class="text-sm font-normal text-on-surface-variant">/100分</span></span>
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-success/15 text-success">良好</span>
+              </div>
+            </div>
+            <div class="w-full h-3 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-accent-yellow via-accent-green to-primary" style="width: 79%"></div>
+            </div>
+          </div>
+
+          <!-- 提示区域 - 浅黄背景 -->
+          <div class="bg-accent-yellow/10 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-on-surface mb-2 flex items-center gap-1.5">
+              <i data-lucide="lightbulb" class="w-4 h-4 text-accent-yellow"></i>给你的提示（不是答案）
+            </h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">第4行if判断那里，你用的符号和"赋值"用的符号一样吗？Python里"判断相等"和"赋值"用的是同一个符号吗？想一想这两者的区别。</p>
+          </div>
+
+          <!-- 练习题区域 - 浅绿背景 -->
+          <div class="bg-accent-green/10 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-on-surface mb-2 flex items-center gap-1.5">
+              <i data-lucide="pencil-line" class="w-4 h-4 text-accent-green"></i>类似练习题
+            </h3>
+            <p class="text-sm text-on-surface-variant leading-relaxed">写一个函数，接收一个列表，返回其中所有奇数的个数。（注意：这次是计数不是求和，判断奇偶数的条件你会怎么写？）</p>
+          </div>
+
+          <!-- 易错知识点区域 - 浅紫背景标签 -->
+          <div class="bg-primary/8 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-on-surface mb-3 flex items-center gap-1.5">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-primary"></i>易错知识点
+            </h3>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary">
+              比较运算符 == 与赋值运算符 = 的区别
+            </span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- @main-content:end -->
+  </main>
+
+  <script>
+    lucide.createIcons();
+
+    $(function() {
+
+      // 点击"开始评价"按钮
+      $('#btn-submit').on('click', function() {
+        var name = $('#input-name').val().trim();
+        var question = $('#input-question').val().trim();
+        var code = $('#input-code').val().trim();
+
+        // 简单的表单验证
+        if (!name) {
+          $('#input-name').focus();
+          return;
+        }
+        if (!question) {
+          $('#input-question').focus();
+          return;
+        }
+        if (!code) {
+          $('#input-code').focus();
+          return;
+        }
+
+        // 更新报告中的学生姓名（仅更新标题区域，报告内容保持硬编码）
+        $('#report-student-name').text(name);
+
+        // 切换显示：隐藏引导卡片，显示报告内容
+        $('#report-placeholder').hide();
+        $('#report-content').removeClass('hidden');
+
+        // 滚动到报告区域顶部
+        $('html, body').animate({
+          scrollTop: $('#report-content').offset().top - 80
+        }, 400);
+      });
+
+    });
+  </script>
+</body>
+
+</html>

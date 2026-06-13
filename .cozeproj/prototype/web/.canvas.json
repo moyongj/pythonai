@@ -1,0 +1,20 @@
+{
+  "elements": [
+    {
+      "type": "html",
+      "options": {
+        "path": ".cozeproj/prototype/web/home.html"
+      },
+      "title": "代码评价",
+      "size": "web"
+    },
+    {
+      "type": "html",
+      "options": {
+        "path": ".cozeproj/prototype/web/statistics.html"
+      },
+      "title": "学情统计",
+      "size": "web"
+    }
+  ]
+}

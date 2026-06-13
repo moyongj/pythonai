@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 字体：Nunito（圆润现代无衬线）+ Noto Sans SC（中文） -->
+  <link href="https://lf-code-agent.coze.cn/obj/x-ai-cn/fonts/google/css2?family=Nunito:wght@400;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/jquery/jquery-3.7.1.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/lucide/lucide-1.11.0.min.js"></script>
+  <script src="https://lf-code-agent.coze.cn/obj/x-ai-cn/cdn/tailwindcss/tailwindcss-browser-4.2.4.min.js"></script>
+
+  <style type="text/tailwindcss">
+    @theme {
+      /* === 品牌色 === */
+      --color-primary:              #5B6CFF;
+      --color-primary-container:    #E0E3FF;
+      --color-on-primary:           #ffffff;
+      /* === 背景 / 表面 === */
+      --color-background:                 #F7F8FF;
+      --color-surface-container-lowest:   #FFFFFF;
+      --color-surface:                    #FFFFFF;
+      --color-surface-container:          #EEF0FF;
+      --color-surface-container-high:     #E4E6F7;
+      --color-surface-container-highest:  #D8DBF0;
+      /* === 文字 === */
+      --color-on-surface:           #1F2433;
+      --color-on-surface-variant:   #6B7294;
+      /* === 功能色 === */
+      --color-success:  #55C59D;
+      --color-error:    #EF4444;
+      --color-warning:  #FFD166;
+      /* === 装饰色（教育风活力色） === */
+      --color-accent-yellow:  #FFD166;
+      --color-accent-pink:    #FF7AB6;
+      --color-accent-green:   #55C59D;
+      /* === 边框 === */
+      --color-outline:          #C7CADB;
+      --color-outline-variant:  #E0E2EF;
+      /* === 圆角 === */
+      --radius-sm:   0.375rem;
+      --radius-md:   0.5rem;
+      --radius-lg:   0.75rem;
+      --radius-xl:   1rem;
+      --radius-2xl:  1.5rem;
+      --radius-full: 9999px;
+      /* === 阴影 === */
+      --shadow-card:   0 2px 8px rgba(0,0,0,0.08);
+      --shadow-float:  0 10px 25px rgba(0,0,0,0.10);
+      --shadow-dialog: 0 25px 50px rgba(0,0,0,0.12);
+      /* === 字体 === */
+      --font-sans: "Nunito", "Noto Sans SC", system-ui, sans-serif;
+    }
+  </style>
+
+  <!-- 图片兜底 -->
+  <script>
+    document.addEventListener('error', function (e) {
+      const img = e.target;
+      if (img.tagName !== 'IMG' || img.dataset.fallback) return;
+      img.dataset.fallback = '1';
+      const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cat = img.getAttribute('data-category') || '其他';
+      const alt = img.getAttribute('alt') || '';
+      const label = esc(alt.length > 8 ? alt.slice(0, 8) + '…' : alt);
+      const icons = { '人物': '👤', '自然风景': '🏞', '动物': '🐾', '建筑城市': '🏙', '运动体育': '⚽', '交通工具': '🚗', '食物': '🍽', '服饰时尚': '👗', '商业科技': '💼', '游戏娱乐': '🎮', '艺术': '🎨', '其他': '🖼' };
+      const icon = icons[cat] || '🖼';
+      const w = img.width || 400, h = img.height || 300;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="%23f3f4f6"/><text x="50%" y="45%" text-anchor="middle" font-size="${Math.min(w, h) * 0.18}" dominant-baseline="central">${icon}</text><text x="50%" y="68%" text-anchor="middle" font-size="${Math.min(w, h) * 0.07}" fill="%239ca3af" font-family="system-ui,sans-serif" dominant-baseline="central">${label}</text></svg>`;
+      img.src = 'data:image/svg+xml,' + svg;
+    }, true);
+  </script>
+
+  <style>
+    /* 柱状图动画 */
+    .bar-col { transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    /* 进度环动画 */
+    .ring-progress { transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+    /* 词云标签 hover */
+    .word-tag { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .word-tag:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(91,108,255,0.15); }
+  </style>
+</head>
+
+<body class="bg-background text-on-surface font-sans">
+
+  <!-- @nav:start 导航组件 -->
+  <header class="bg-surface sticky top-0 z-40 shadow-card">
+    <div class="max-w-6xl mx-auto h-16 flex items-center justify-between px-6">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
+          <i data-lucide="code" class="w-5 h-5 text-on-primary"></i>
+        </div>
+        <span class="font-bold text-lg text-on-surface">码上成长</span>
+        <span class="text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full ml-1">Python 评价助手</span>
+      </div>
+      <nav class="flex items-center gap-1">
+        <a href="home.html" class="nav-link px-4 py-2 text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors flex items-center gap-1.5">
+          <i data-lucide="message-square-code" class="w-4 h-4"></i>代码评价
+        </a>
+        <a href="statistics.html" class="nav-link px-4 py-2 text-sm font-semibold text-on-surface bg-primary/10 rounded-lg transition-colors flex items-center gap-1.5" aria-current="page">
+          <i data-lucide="bar-chart" class="w-4 h-4 text-primary"></i>学情统计
+        </a>
+      </nav>
+    </div>
+  </header>
+  <!-- @nav:end 导航组件 -->
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <!-- 页面标题 -->
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-on-surface">学情统计</h1>
+      <p class="text-sm text-on-surface-variant mt-1">查看学生历史评价记录与数据分析</p>
+    </div>
+
+    <!-- ========== 1. 顶部概览卡片组 ========== -->
+    <div class="grid grid-cols-4 gap-5 mb-8">
+      <!-- 卡片-总评价次数 -->
+      <div class="bg-surface rounded-xl shadow-card p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <i data-lucide="zap" class="w-6 h-6 text-primary"></i>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-on-surface">42</div>
+          <div class="text-xs text-on-surface-variant mt-0.5">总评价次数</div>
+        </div>
+      </div>
+      <!-- 卡片-平均分 -->
+      <div class="bg-surface rounded-xl shadow-card p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-accent-yellow/15 flex items-center justify-center shrink-0">
+          <i data-lucide="trophy" class="w-6 h-6 text-accent-yellow"></i>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-on-surface">73.5</div>
+          <div class="text-xs text-on-surface-variant mt-0.5">平均分</div>
+        </div>
+      </div>
+      <!-- 卡片-优秀率 -->
+      <div class="bg-surface rounded-xl shadow-card p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-accent-green/15 flex items-center justify-center shrink-0">
+          <i data-lucide="star" class="w-6 h-6 text-accent-green"></i>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-on-surface">28.6%</div>
+          <div class="text-xs text-on-surface-variant mt-0.5">优秀率</div>
+        </div>
+      </div>
+      <!-- 卡片-易错知识点 -->
+      <div class="bg-surface rounded-xl shadow-card p-5 flex items-center gap-4">
+        <div class="w-12 h-12 rounded-xl bg-accent-pink/15 flex items-center justify-center shrink-0">
+          <i data-lucide="lightbulb" class="w-6 h-6 text-accent-pink"></i>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-on-surface">15</div>
+          <div class="text-xs text-on-surface-variant mt-0.5">易错知识点</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 2. 成绩分布图 + 3. 易错知识点排行 ========== -->
+    <div class="grid grid-cols-5 gap-5 mb-8">
+      <!-- 成绩分布图（左侧约60% = 3/5） -->
+      <div class="col-span-3 bg-surface rounded-xl shadow-card p-6">
+        <h2 class="text-base font-bold text-on-surface mb-5">成绩分布</h2>
+        <!-- 柱状图容器 -->
+        <div class="flex items-end justify-between gap-4" style="height: 220px;">
+          <!-- 柱子-0-59 (5人) -->
+          <div class="flex-1 flex flex-col items-center justify-end h-full">
+            <span class="text-xs font-semibold text-on-surface mb-2">5人</span>
+            <div class="bar-col w-full rounded-t-md bg-error" style="height: 41.67%;"></div>
+            <span class="text-xs text-on-surface-variant mt-3">0-59</span>
+          </div>
+          <!-- 柱子-60-69 (8人) -->
+          <div class="flex-1 flex flex-col items-center justify-end h-full">
+            <span class="text-xs font-semibold text-on-surface mb-2">8人</span>
+            <div class="bar-col w-full rounded-t-md bg-warning" style="height: 66.67%;"></div>
+            <span class="text-xs text-on-surface-variant mt-3">60-69</span>
+          </div>
+          <!-- 柱子-70-79 (12人) -->
+          <div class="flex-1 flex flex-col items-center justify-end h-full">
+            <span class="text-xs font-semibold text-on-surface mb-2">12人</span>
+            <div class="bar-col w-full rounded-t-md bg-primary" style="height: 100%;"></div>
+            <span class="text-xs text-on-surface-variant mt-3">70-79</span>
+          </div>
+          <!-- 柱子-80-89 (10人) -->
+          <div class="flex-1 flex flex-col items-center justify-end h-full">
+            <span class="text-xs font-semibold text-on-surface mb-2">10人</span>
+            <div class="bar-col w-full rounded-t-md bg-success" style="height: 83.33%;"></div>
+            <span class="text-xs text-on-surface-variant mt-3">80-89</span>
+          </div>
+          <!-- 柱子-90-100 (7人) -->
+          <div class="flex-1 flex flex-col items-center justify-end h-full">
+            <span class="text-xs font-semibold text-on-surface mb-2">7人</span>
+            <div class="bar-col w-full rounded-t-md bg-accent-pink" style="height: 58.33%;"></div>
+            <span class="text-xs text-on-surface-variant mt-3">90-100</span>
+          </div>
+        </div>
+        <div class="text-xs text-on-surface-variant mt-4 text-center">共 42 名学生</div>
+      </div>
+
+      <!-- 易错知识点排行（右侧约40% = 2/5） -->
+      <div class="col-span-2 bg-surface rounded-xl shadow-card p-6">
+        <h2 class="text-base font-bold text-on-surface mb-5">易错知识点 TOP 5</h2>
+        <div class="space-y-4">
+          <!-- 排行-1 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-sm text-on-surface font-medium truncate mr-3">比较运算符 == 与赋值运算符 = 的区别</span>
+              <span class="text-xs text-on-surface-variant shrink-0">12次</span>
+            </div>
+            <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-primary" style="width: 100%;"></div>
+            </div>
+          </div>
+          <!-- 排行-2 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-sm text-on-surface font-medium truncate mr-3">for循环缩进错误</span>
+              <span class="text-xs text-on-surface-variant shrink-0">9次</span>
+            </div>
+            <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-primary" style="width: 75%;"></div>
+            </div>
+          </div>
+          <!-- 排行-3 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-sm text-on-surface font-medium truncate mr-3">print函数括号遗漏</span>
+              <span class="text-xs text-on-surface-variant shrink-0">7次</span>
+            </div>
+            <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-primary" style="width: 58.3%;"></div>
+            </div>
+          </div>
+          <!-- 排行-4 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-sm text-on-surface font-medium truncate mr-3">变量未定义直接使用</span>
+              <span class="text-xs text-on-surface-variant shrink-0">6次</span>
+            </div>
+            <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-primary" style="width: 50%;"></div>
+            </div>
+          </div>
+          <!-- 排行-5 -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-sm text-on-surface font-medium truncate mr-3">if-else条件逻辑颠倒</span>
+              <span class="text-xs text-on-surface-variant shrink-0">5次</span>
+            </div>
+            <div class="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-primary" style="width: 41.7%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 4. 四维度平均得分雷达图区域 ========== -->
+    <div class="bg-surface rounded-xl shadow-card p-6 mb-8">
+      <h2 class="text-base font-bold text-on-surface mb-6">四维度平均得分</h2>
+      <div class="grid grid-cols-4 gap-6">
+        <!-- 维度1-题目理解与实现 -->
+        <div class="flex flex-col items-center">
+          <div class="relative w-32 h-32">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="stroke-surface-container" />
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="ring-progress stroke-primary"
+                      stroke-linecap="round"
+                      stroke-dasharray="314.16"
+                      stroke-dashoffset="89.42" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-xl font-bold text-on-surface">71.7%</span>
+              <span class="text-xs text-on-surface-variant">21.5/30</span>
+            </div>
+          </div>
+          <span class="text-sm font-medium text-on-surface mt-3 text-center">题目理解与实现</span>
+        </div>
+        <!-- 维度2-逻辑思路 -->
+        <div class="flex flex-col items-center">
+          <div class="relative w-32 h-32">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="stroke-surface-container" />
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="ring-progress stroke-accent-yellow"
+                      stroke-linecap="round"
+                      stroke-dasharray="314.16"
+                      stroke-dashoffset="72.26" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-xl font-bold text-on-surface">76.8%</span>
+              <span class="text-xs text-on-surface-variant">19.2/25</span>
+            </div>
+          </div>
+          <span class="text-sm font-medium text-on-surface mt-3 text-center">逻辑思路</span>
+        </div>
+        <!-- 维度3-代码可读性 -->
+        <div class="flex flex-col items-center">
+          <div class="relative w-32 h-32">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="stroke-surface-container" />
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="ring-progress stroke-accent-green"
+                      stroke-linecap="round"
+                      stroke-dasharray="314.16"
+                      stroke-dashoffset="76.89" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-xl font-bold text-on-surface">75.2%</span>
+              <span class="text-xs text-on-surface-variant">18.8/25</span>
+            </div>
+          </div>
+          <span class="text-sm font-medium text-on-surface mt-3 text-center">代码可读性</span>
+        </div>
+        <!-- 维度4-语法掌握 -->
+        <div class="flex flex-col items-center">
+          <div class="relative w-32 h-32">
+            <svg class="w-full h-full -rotate-90" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="stroke-surface-container" />
+              <circle cx="60" cy="60" r="50" stroke-width="8" fill="none" class="ring-progress stroke-accent-pink"
+                      stroke-linecap="round"
+                      stroke-dasharray="314.16"
+                      stroke-dashoffset="94.25" />
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center">
+              <span class="text-xl font-bold text-on-surface">70.0%</span>
+              <span class="text-xs text-on-surface-variant">14.0/20</span>
+            </div>
+          </div>
+          <span class="text-sm font-medium text-on-surface mt-3 text-center">语法掌握</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 5. 最近评价记录表格 ========== -->
+    <div class="bg-surface rounded-xl shadow-card overflow-hidden mb-8">
+      <div class="px-6 py-4 border-b border-outline-variant/50">
+        <h2 class="text-base font-bold text-on-surface">最近评价记录</h2>
+      </div>
+      <!-- 表头 -->
+      <div class="grid grid-cols-6 px-6 py-3 bg-surface-container text-xs font-semibold text-on-surface-variant tracking-wide">
+        <span>学生姓名</span>
+        <span>题目</span>
+        <span>总分</span>
+        <span>等级</span>
+        <span>易错知识点</span>
+        <span>评价时间</span>
+      </div>
+      <div class="divide-y divide-outline-variant/50">
+        <!-- 列表-记录1 -->
+        <div class="grid grid-cols-6 px-6 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-medium text-on-surface">李明</span>
+          <span class="text-sm text-on-surface-variant">列表偶数求和</span>
+          <span class="text-sm font-semibold text-on-surface">79</span>
+          <span><span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-primary/15 text-primary">良好</span></span>
+          <span class="text-sm text-on-surface-variant">==与=的区别</span>
+          <span class="text-sm text-on-surface-variant">2024-01-15 14:30</span>
+        </div>
+        <!-- 列表-记录2 -->
+        <div class="grid grid-cols-6 px-6 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-medium text-on-surface">王芳</span>
+          <span class="text-sm text-on-surface-variant">字符串反转</span>
+          <span class="text-sm font-semibold text-on-surface">85</span>
+          <span><span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-success/15 text-success">优秀</span></span>
+          <span class="text-sm text-on-surface-variant">for循环缩进</span>
+          <span class="text-sm text-on-surface-variant">2024-01-15 13:20</span>
+        </div>
+        <!-- 列表-记录3 -->
+        <div class="grid grid-cols-6 px-6 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-medium text-on-surface">张伟</span>
+          <span class="text-sm text-on-surface-variant">阶乘计算</span>
+          <span class="text-sm font-semibold text-on-surface">62</span>
+          <span><span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-warning/20 text-yellow-700">及格</span></span>
+          <span class="text-sm text-on-surface-variant">变量未定义</span>
+          <span class="text-sm text-on-surface-variant">2024-01-15 11:45</span>
+        </div>
+        <!-- 列表-记录4 -->
+        <div class="grid grid-cols-6 px-6 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-medium text-on-surface">刘洋</span>
+          <span class="text-sm text-on-surface-variant">冒泡排序</span>
+          <span class="text-sm font-semibold text-on-surface">91</span>
+          <span><span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-success/15 text-success">优秀</span></span>
+          <span class="text-sm text-on-surface-variant">无</span>
+          <span class="text-sm text-on-surface-variant">2024-01-14 16:50</span>
+        </div>
+        <!-- 列表-记录5 -->
+        <div class="grid grid-cols-6 px-6 py-3.5 hover:bg-surface-container/50 transition-colors items-center">
+          <span class="text-sm font-medium text-on-surface">陈思</span>
+          <span class="text-sm text-on-surface-variant">回文判断</span>
+          <span class="text-sm font-semibold text-on-surface">73</span>
+          <span><span class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-primary/15 text-primary">良好</span></span>
+          <span class="text-sm text-on-surface-variant">if-else逻辑</span>
+          <span class="text-sm text-on-surface-variant">2024-01-14 15:30</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 6. 知识点词云区域 ========== -->
+    <div class="bg-surface rounded-xl shadow-card p-6">
+      <h2 class="text-base font-bold text-on-surface mb-5">知识点词云</h2>
+      <div id="word-cloud" class="flex flex-wrap gap-3 items-center justify-center py-4">
+        <!-- 词云标签-1: if判断 -->
+        <span class="word-tag inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-primary/10 text-primary cursor-default">if判断</span>
+        <!-- 词云标签-2: for循环 -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-yellow/15 text-yellow-700 cursor-default">for循环</span>
+        <!-- 词云标签-3: while循环 -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-pink/10 text-accent-pink cursor-default">while循环</span>
+        <!-- 词云标签-4: 变量命名 -->
+        <span class="word-tag inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-accent-green/10 text-accent-green cursor-default">变量命名</span>
+        <!-- 词云标签-5: 缩进 -->
+        <span class="word-tag inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-primary/10 text-primary cursor-default">缩进</span>
+        <!-- 词云标签-6: print -->
+        <span class="word-tag inline-flex items-center px-5 py-2.5 rounded-xl text-lg font-bold bg-accent-yellow/15 text-yellow-700 cursor-default">print</span>
+        <!-- 词云标签-7: input -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-pink/10 text-accent-pink cursor-default">input</span>
+        <!-- 词云标签-8: 列表 -->
+        <span class="word-tag inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-accent-green/10 text-accent-green cursor-default">列表</span>
+        <!-- 词云标签-9: 字典 -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary cursor-default">字典</span>
+        <!-- 词云标签-10: 函数定义 -->
+        <span class="word-tag inline-flex items-center px-4 py-2 rounded-lg text-sm font-bold bg-accent-yellow/15 text-yellow-700 cursor-default">函数定义</span>
+        <!-- 词云标签-11: 返回值 -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-pink/10 text-accent-pink cursor-default">返回值</span>
+        <!-- 词云标签-12: 字符串 -->
+        <span class="word-tag inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-accent-green/10 text-accent-green cursor-default">字符串</span>
+        <!-- 词云标签-13: 类型转换 -->
+        <span class="word-tag inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-primary/10 text-primary cursor-default">类型转换</span>
+        <!-- 词云标签-14: 比较运算 -->
+        <span class="word-tag inline-flex items-center px-5 py-2.5 rounded-xl text-lg font-bold bg-accent-yellow/15 text-yellow-700 cursor-default">比较运算</span>
+        <!-- 词云标签-15: 逻辑运算 -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-pink/10 text-accent-pink cursor-default">逻辑运算</span>
+        <!-- 词云标签-16: range -->
+        <span class="word-tag inline-flex items-center px-4 py-2 rounded-lg text-sm font-bold bg-accent-green/10 text-accent-green cursor-default">range</span>
+        <!-- 词云标签-17: len -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary cursor-default">len</span>
+        <!-- 词云标签-18: append -->
+        <span class="word-tag inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm font-semibold bg-accent-yellow/15 text-yellow-700 cursor-default">append</span>
+        <!-- 词云标签-19: split -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-pink/10 text-accent-pink cursor-default">split</span>
+        <!-- 词云标签-20: strip -->
+        <span class="word-tag inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-accent-green/10 text-accent-green cursor-default">strip</span>
+      </div>
+    </div>
+  </main>
+
+  <script>lucide.createIcons();</script>
+
+  <script>
+  $(function() {
+    // 词云标签点击 - 展示该知识点详情
+    // 后续应实现：
+    // 1. 点击标签后弹出模态框或跳转到该知识点的详细分析页
+    // 2. 展示该知识点的出错频率、典型错误示例、改进建议
+    // 3. 关联展示涉及该知识点的学生列表
+    $('#word-cloud').on('click', '.word-tag', function() {
+      console.log('查看知识点:', $(this).text().trim());
+    });
+
+    // 评价记录行点击 - 跳转到评价详情
+    // 后续应实现：
+    // 1. 点击行后跳转到该评价的详细页面
+    // 2. 页面中展示学生的代码、四维度评分、AI评价建议
+    $('#table-body .record-row').on('click', function() {
+      var recordId = $(this).data('id');
+      window.location.href = 'home.html?record_id=' + recordId;
+    });
+  });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.zeabur.app/template.json",
+  "name": "码上成长",
+  "description": "Python代码智能评价与学情诊断助手",
+  "icon": "https://cdn.zeabur.app/assets/icons/python.svg",
+  "services": [
+    {
+      "name": "web",
+      "template": "NODE",
+      "env": {
+        "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}",
+        "DEEPSEEK_API_BASE": "${DEEPSEEK_API_BASE}"
+      }
+    }
+  ]
+}
