@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { insertRecord } from '@/lib/db';
+import { addEvaluation } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 interface EvaluationRequest {
   name: string;
+  studentId?: string;
   question: string;
   code: string;
 }
@@ -397,10 +398,7 @@ export async function POST(request: NextRequest) {
       '在原题基础上增加一个输入校验：当参数不合法时，打印提示并返回 0。',
     );
 
-    await insertRecord({
-      studentName: name,
-      question,
-      code,
+    const dbReport = JSON.stringify({
       understandingScore: understanding,
       logicScore: logic,
       readabilityScore: readability,
@@ -410,8 +408,17 @@ export async function POST(request: NextRequest) {
       hint,
       practice,
       knowledgePoints,
-      createdAt: new Date().toISOString(),
     });
+
+    if (body.studentId) {
+      addEvaluation({
+        studentId: body.studentId,
+        question,
+        code,
+        report: dbReport,
+        score: total,
+      });
+    }
 
     const report = {
       studentName: name,

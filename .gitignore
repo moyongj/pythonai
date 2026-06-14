@@ -159,3 +159,6 @@ Desktop.ini
 *.tsbuildinfo
 # Misc
 .coze-logs
+
+# Database files
+data/

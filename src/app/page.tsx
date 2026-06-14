@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   User,
   FileText,
@@ -18,6 +19,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { validateSession, type Student } from '@/lib/auth';
 
 type DimensionKey =
   | 'understanding'
@@ -34,13 +36,6 @@ interface Dimension {
   color: 'yellow' | 'green' | 'primary' | 'pink';
 }
 
-const ICON_MAP: Record<DimensionKey, typeof Target> = {
-  understanding: Target,
-  logic: Brain,
-  readability: Eye,
-  syntax: Code,
-};
-
 interface EvaluationReport {
   studentName: string;
   dimensions: Dimension[];
@@ -51,6 +46,13 @@ interface EvaluationReport {
   knowledgePoints: string[];
 }
 
+const ICON_MAP: Record<DimensionKey, typeof Target> = {
+  understanding: Target,
+  logic: Brain,
+  readability: Eye,
+  syntax: Code,
+};
+
 const COLOR_MAP: Record<Dimension['color'], { bar: string; text: string; border: string }> = {
   yellow: { bar: 'bg-accent-yellow', text: 'text-accent-yellow', border: 'border-l-accent-yellow' },
   green: { bar: 'bg-accent-green', text: 'text-accent-green', border: 'border-l-accent-green' },
@@ -58,6 +60,9 @@ const COLOR_MAP: Record<Dimension['color'], { bar: string; text: string; border:
   pink: { bar: 'bg-accent-pink', text: 'text-accent-pink', border: 'border-l-accent-pink' },
 };
 
+/**
+ * 根据总分计算等级
+ */
 function scoreToLevel(total: number): string {
   if (total >= 85) return '优秀';
   if (total >= 70) return '良好';
@@ -65,6 +70,9 @@ function scoreToLevel(total: number): string {
   return '待提升';
 }
 
+/**
+ * 根据等级获取徽章样式
+ */
 function levelToBadgeClass(level: string): string {
   if (level === '优秀') return 'bg-accent-green/15 text-accent-green';
   if (level === '良好') return 'bg-primary/15 text-primary';
@@ -72,14 +80,62 @@ function levelToBadgeClass(level: string): string {
   return 'bg-destructive/15 text-destructive';
 }
 
+/**
+ * 主页组件 - 代码评价页面
+ * 学生提交代码后AI进行智能诊断并生成评价报告
+ */
 export default function Home() {
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState<{ type: 'student'; user: Student } | null>(null);
   const [name, setName] = useState('');
   const [question, setQuestion] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<EvaluationReport | null>(null);
+  const [pageLoading, setPageLoading] = useState(true);
 
+  /**
+   * 页面初始化时验证session
+   */
+  useEffect(() => {
+    const checkSession = async () => {
+      const result = await validateSession();
+      if (!result.success || result.userType === 'admin') {
+        router.push('/login');
+        return;
+      }
+      if (result.user && result.userType === 'student') {
+        const student = result.user as Student;
+        setCurrentUser({ type: 'student', user: student });
+        setName(student.name);
+      }
+      setPageLoading(false);
+    };
+    checkSession();
+  }, [router]);
+
+  /**
+   * 从sessionStorage恢复之前填写的内容
+   */
+  useEffect(() => {
+    const storedQuestion = sessionStorage.getItem('evaluation-question');
+    const storedCode = sessionStorage.getItem('evaluation-code');
+    
+    if (storedQuestion) {
+      setQuestion(storedQuestion);
+      sessionStorage.removeItem('evaluation-question');
+    }
+    
+    if (storedCode) {
+      setCode(storedCode);
+      sessionStorage.removeItem('evaluation-code');
+    }
+  }, []);
+
+  /**
+   * 处理代码评价提交
+   */
   async function handleSubmit() {
     if (!name.trim()) {
       setError('请填写学生姓名');
@@ -100,18 +156,27 @@ export default function Home() {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, question, code }),
+        body: JSON.stringify({ name, studentId: currentUser?.user.studentId, question, code }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || '评价失败，请稍后重试');
       }
-      setReport(data.report as EvaluationReport);
+      const reportData = data.report as EvaluationReport;
+      setReport(reportData);
     } catch (e) {
       setError(e instanceof Error ? e.message : '评价失败');
     } finally {
       setLoading(false);
     }
+  }
+
+  if (pageLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
