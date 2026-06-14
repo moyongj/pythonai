@@ -30,14 +30,32 @@ export async function POST(request: Request) {
       );
     }
 
-    const validStudents = students
-      .filter((s: { class?: string; name?: string; studentId?: string; password?: string }) => s.studentId && s.name)
-      .map((s: { class?: string; name?: string; studentId?: string; password?: string }) => ({
-        class: s.class || '',
-        name: s.name,
-        studentId: s.studentId,
-        password: s.password || '123456',
-      }));
+    interface StudentInput {
+      class?: string;
+      name?: string;
+      studentId?: string;
+      password?: string;
+    }
+
+    interface ValidStudent {
+      studentId: string;
+      name: string;
+      class: string;
+      password: string;
+    }
+
+    const validStudents: ValidStudent[] = [];
+    
+    for (const s of students as StudentInput[]) {
+      if (s.studentId && s.name) {
+        validStudents.push({
+          studentId: s.studentId,
+          name: s.name,
+          class: s.class || '',
+          password: s.password || '123456',
+        });
+      }
+    }
 
     if (validStudents.length === 0) {
       return NextResponse.json(

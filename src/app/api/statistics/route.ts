@@ -4,6 +4,25 @@ import * as XLSX from 'xlsx';
 
 export const runtime = 'nodejs';
 
+interface EvaluationRecord {
+  id: number;
+  student_id: string;
+  question: string;
+  code: string;
+  report: string;
+  total_score: number;
+  understanding_score: number;
+  logic_score: number;
+  readability_score: number;
+  syntax_score: number;
+  level: string;
+  hint: string;
+  practice: string;
+  created_at: string;
+  student_name?: string;
+  student_class?: string;
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -17,21 +36,21 @@ export async function GET(request: Request) {
       const minScore = url.searchParams.get('minScore') ? parseInt(url.searchParams.get('minScore')!) : undefined;
       const maxScore = url.searchParams.get('maxScore') ? parseInt(url.searchParams.get('maxScore')!) : undefined;
 
-      let records: any[];
+      let records: EvaluationRecord[];
       let fileName = 'all_records';
 
       if (studentName && !knowledgePoint && minScore === undefined && maxScore === undefined) {
-        records = await searchRecords({ studentName }) as any[];
+        records = await searchRecords({ studentName }) as EvaluationRecord[];
         fileName = `学生_${studentName}_评价记录`;
       } else if (knowledgePoint && !studentName && minScore === undefined && maxScore === undefined) {
-        records = await searchRecords({ knowledgePoint }) as any[];
+        records = await searchRecords({ knowledgePoint }) as EvaluationRecord[];
         const shortKpName = knowledgePoint.length > 20 ? knowledgePoint.substring(0, 20) : knowledgePoint;
         fileName = `知识点_${shortKpName}_评价记录`;
       } else if (studentName || knowledgePoint || minScore !== undefined || maxScore !== undefined) {
-        records = await searchRecords({ studentName, knowledgePoint, minScore, maxScore }) as any[];
+        records = await searchRecords({ studentName, knowledgePoint, minScore, maxScore }) as EvaluationRecord[];
         fileName = '筛选结果_评价记录';
       } else {
-        records = await getAllRecords() as any[];
+        records = await getAllRecords() as EvaluationRecord[];
         fileName = '全部评价记录';
       }
 
@@ -40,6 +59,7 @@ export async function GET(request: Request) {
         const isValidDate = !isNaN(date.getTime());
         return {
           '学生姓名': r.student_name || '',
+          '班级': r.student_class || '',
           '题目': r.question || '',
           '代码': r.code || '',
           '理解得分': r.understanding_score || 0,
@@ -50,7 +70,6 @@ export async function GET(request: Request) {
           '等级': r.level || '',
           '提示': r.hint || '',
           '练习建议': r.practice || '',
-          '易错知识点': (r.knowledgePoints || []).join('; '),
           '评价时间': isValidDate ? date.toLocaleString('zh-CN') : '',
         };
       });
@@ -75,7 +94,7 @@ export async function GET(request: Request) {
       const minScore = url.searchParams.get('minScore') ? parseInt(url.searchParams.get('minScore')!) : undefined;
       const maxScore = url.searchParams.get('maxScore') ? parseInt(url.searchParams.get('maxScore')!) : undefined;
 
-      const records = await searchRecords({ studentName, knowledgePoint, minScore, maxScore }) as any[];
+      const records = await searchRecords({ studentName, knowledgePoint, minScore, maxScore }) as EvaluationRecord[];
 
       const totalPages = Math.ceil(records.length / limit);
       const offset = (page - 1) * limit;
@@ -86,10 +105,11 @@ export async function GET(request: Request) {
         const isValidDate = !isNaN(date.getTime());
         return {
           name: r.student_name || '未知',
+          class: r.student_class || '',
           title: (r.question?.length > 20 ? r.question.substring(0, 20) + '...' : r.question) || '无标题',
           score: r.total_score || 0,
           level: r.level || '待提升',
-          kp: (r.knowledgePoints?.length > 0 ? r.knowledgePoints[0] : '无') || '无',
+          kp: (r.hint?.length > 0 ? r.hint.substring(0, 20) : '无') || '无',
           time: isValidDate ? date.toLocaleString('zh-CN') : '未知时间',
         };
       });
@@ -122,7 +142,7 @@ export async function GET(request: Request) {
       getStatistics(),
       getAllRecords(),
       getKnowledgePointsStats(),
-    ]);
+    ]) as [any, EvaluationRecord[], any[]];
 
     const distribution = [
       { range: '85-100', count: stats.excellentCount as number, color: 'bg-accent-pink', text: 'text-accent-pink' },
@@ -147,10 +167,11 @@ export async function GET(request: Request) {
       const isValidDate = !isNaN(date.getTime());
       return {
         name: r.student_name || '未知',
+        class: r.student_class || '',
         title: (r.question?.length > 20 ? r.question.substring(0, 20) + '...' : r.question) || '无标题',
         score: r.total_score || 0,
         level: r.level || '待提升',
-        kp: (r.knowledgePoints?.length > 0 ? r.knowledgePoints[0] : '无') || '无',
+        kp: (r.hint?.length > 0 ? r.hint.substring(0, 20) : '无') || '无',
         time: isValidDate ? date.toLocaleString('zh-CN') : '未知时间',
       };
     });

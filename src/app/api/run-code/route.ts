@@ -4,11 +4,13 @@ import { spawnSync } from 'child_process';
 function decodeOutput(buffer: Buffer | undefined): string {
   if (!buffer) return '';
   
+  // 尝试不同的编码
   const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5'];
   
   for (const encoding of encodings) {
     try {
-      const decoded = buffer.toString(encoding);
+      const decoder = new TextDecoder(encoding);
+      const decoded = decoder.decode(buffer);
       if (!/[\uFFFD]/.test(decoded)) {
         return decoded;
       }
@@ -17,7 +19,13 @@ function decodeOutput(buffer: Buffer | undefined): string {
     }
   }
   
-  return buffer.toString('utf-8', 'replace');
+  // 最后尝试用UTF-8并替换无效字符
+  try {
+    const decoder = new TextDecoder('utf-8', { fatal: false });
+    return decoder.decode(buffer);
+  } catch {
+    return buffer.toString('latin1');
+  }
 }
 
 export async function POST(request: Request) {

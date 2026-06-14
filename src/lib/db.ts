@@ -275,7 +275,7 @@ export function getAdmin(): Admin | null {
 
 export function validateAdminLogin(username: string, password: string): boolean {
   const admin = getAdmin();
-  return admin && admin.username === username && admin.password === password;
+  return admin !== null && admin.username === username && admin.password === password;
 }
 
 export function updateAdminPassword(username: string, newPassword: string): boolean {
@@ -491,4 +491,131 @@ export function deleteSession(sessionId: string): boolean {
 export function clearOldSessions(): void {
   const db = getDatabase();
   db.prepare('DELETE FROM sessions WHERE created_at < datetime("now", "-7 days", "localtime")').run();
+}
+
+/**
+ * 获取统计数据摘要
+ */
+export function getStatistics() {
+  const db = getDatabase();
+  const records = db.prepare(`
+    SELECT 
+      COUNT(*) as totalCount,
+      COALESCE(AVG(total_score), 0) as avgScore,
+      COALESCE(SUM(CASE WHEN total_score >= 85 THEN 1 ELSE 0 END), 0) as excellentCount,
+      COALESCE(SUM(CASE WHEN total_score >= 70 AND total_score < 85 THEN 1 ELSE 0 END), 0) as goodCount,
+      COALESCE(SUM(CASE WHEN total_score >= 60 AND total_score < 70 THEN 1 ELSE 0 END), 0) as passCount,
+      COALESCE(SUM(CASE WHEN total_score < 60 THEN 1 ELSE 0 END), 0) as failCount
+    FROM evaluations
+  `).get() as any;
+
+  return {
+    totalCount: records?.totalCount || 0,
+    avgScore: records?.avgScore || 0,
+    excellentCount: records?.excellentCount || 0,
+    goodCount: records?.goodCount || 0,
+    passCount: records?.passCount || 0,
+    failCount: records?.failCount || 0,
+    excellentRate: records?.totalCount > 0 ? (records.excellentCount / records.totalCount * 100) : 0,
+  };
+}
+
+/**
+ * 获取所有评价记录（带学生姓名）
+ */
+export function getAllRecords() {
+  const db = getDatabase();
+  const records = db.prepare(`
+    SELECT 
+      e.*,
+      s.name as student_name,
+      s.class as student_class
+    FROM evaluations e
+    LEFT JOIN students s ON e.student_id = s.student_id
+    ORDER BY e.created_at DESC
+  `).all();
+  return records;
+}
+
+/**
+ * 搜索评价记录
+ */
+export function searchRecords(params: {
+  studentName?: string | null;
+  studentClass?: string | null;
+  knowledgePoint?: string | null;
+  minScore?: number;
+  maxScore?: number;
+}) {
+  const db = getDatabase();
+  let sql = `
+    SELECT 
+      e.*,
+      s.name as student_name,
+      s.class as student_class
+    FROM evaluations e
+    LEFT JOIN students s ON e.student_id = s.student_id
+    WHERE 1=1
+  `;
+  const values: any[] = [];
+
+  if (params.studentName) {
+    sql += ' AND s.name LIKE ?';
+    values.push(`%${params.studentName}%`);
+  }
+  if (params.studentClass) {
+    sql += ' AND s.class = ?';
+    values.push(params.studentClass);
+  }
+  if (params.knowledgePoint) {
+    sql += ' AND e.hint LIKE ?';
+    values.push(`%${params.knowledgePoint}%`);
+  }
+  if (params.minScore !== undefined) {
+    sql += ' AND e.total_score >= ?';
+    values.push(params.minScore);
+  }
+  if (params.maxScore !== undefined) {
+    sql += ' AND e.total_score <= ?';
+    values.push(params.maxScore);
+  }
+
+  sql += ' ORDER BY e.created_at DESC';
+
+  const records = db.prepare(sql).all(...values);
+  return records;
+}
+
+/**
+ * 获取知识点统计
+ */
+export function getKnowledgePointsStats() {
+  const db = getDatabase();
+  const records = db.prepare('SELECT hint FROM evaluations').all() as { hint: string }[];
+  const kpCount: Record<string, number> = {};
+
+  records.forEach((record: { hint: string }) => {
+    if (record.hint) {
+      const words = record.hint.split(/[,，、；;]/).filter(w => w.trim().length > 0);
+      words.forEach(word => {
+        const cleanWord = word.trim();
+        if (cleanWord.length > 0) {
+          kpCount[cleanWord] = (kpCount[cleanWord] || 0) + 1;
+        }
+      });
+    }
+  });
+
+  return Object.entries(kpCount)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * 获取所有学生姓名
+ */
+export function getAllStudentNames() {
+  const db = getDatabase();
+  const records = db.prepare('SELECT DISTINCT name, class FROM students ORDER BY class, name').all() as { name: string; class: string }[];
+  return records;
 }
