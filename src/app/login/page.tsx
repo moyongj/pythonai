@@ -54,11 +54,14 @@ export default function LoginPage() {
       const result = await login(loginType, username, password);
       if (result.success && result.sessionId) {
         setSessionId(result.sessionId);
-        if (loginType === 'admin') {
-          router.push('/admin');
-        } else {
-          router.push('/');
-        }
+        // 确保sessionId已写入localStorage后再跳转
+        Promise.resolve().then(() => {
+          if (loginType === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/');
+          }
+        });
       } else {
         setError(result.error || '登录失败，请检查账号密码');
       }
