@@ -41,7 +41,16 @@ export async function POST(request: Request) {
 
     const inputString = Array.isArray(inputs) ? inputs.join('\n') + '\n' : '';
 
-    const result = spawnSync('python', ['-c', `import sys; sys.stdout.reconfigure(encoding='utf-8'); sys.stderr.reconfigure(encoding='utf-8');\n${code}`], {
+    const pythonPath = process.env.PYTHON_PATH || 'python';
+    
+    const pythonCode = `
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
+${code}
+`;
+    
+    const result = spawnSync(pythonPath, ['-c', pythonCode], {
       timeout: 10000,
       maxBuffer: 1024 * 1024,
       stdio: ['pipe', 'pipe', 'pipe'],
