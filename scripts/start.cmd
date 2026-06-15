@@ -1,8 +1,10 @@
 @echo off
-echo Starting the Next.js production server...
+echo Starting HTTP service on port 5000 for deploy...
 
-REM Start the server in the background
-start "Next.js Server" cmd /c "node_modules\.bin\next start"
+REM Set port environment variable
+set PORT=5000
 
-echo Server started! Please check the new window for server status.
-pause
+REM Run the custom server
+node dist/server.js
+
+echo Server stopped.

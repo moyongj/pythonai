@@ -172,6 +172,25 @@ function initTables(db: Database.Database): void {
       user_id TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS chat_conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT UNIQUE NOT NULL,
+      student_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (student_id) REFERENCES students(student_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (conversation_id) REFERENCES chat_conversations(conversation_id)
+    );
   `);
 
   const adminExists = db.prepare('SELECT COUNT(*) as count FROM admin').get() as { count: number };
@@ -568,22 +587,19 @@ export function searchRecords(params: {
     values.push(params.studentClass);
   }
   if (params.knowledgePoint) {
-    sql += ' AND e.hint LIKE ?';
+    sql += ' AND e.report LIKE ?';
     values.push(`%${params.knowledgePoint}%`);
   }
-  if (params.minScore !== undefined) {
-    sql += ' AND e.total_score >= ?';
+  if (typeof params.minScore === 'number') {
+    sql += ' AND e.score >= ?';
     values.push(params.minScore);
   }
-  if (params.maxScore !== undefined) {
-    sql += ' AND e.total_score <= ?';
+  if (typeof params.maxScore === 'number') {
+    sql += ' AND e.score <= ?';
     values.push(params.maxScore);
   }
-
   sql += ' ORDER BY e.created_at DESC';
-
-  const records = db.prepare(sql).all(...values);
-  return records;
+  return db.prepare(sql).all(...values);
 }
 
 /**
@@ -618,4 +634,145 @@ export function getAllStudentNames() {
   const db = getDatabase();
   const records = db.prepare('SELECT DISTINCT name, class FROM students ORDER BY class, name').all() as { name: string; class: string }[];
   return records;
+}
+
+/* ========== AI聊天会话操作 ========== */
+
+export interface ChatConversation {
+  id: number;
+  conversationId: string;
+  studentId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: number;
+  conversationId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  createdAt: string;
+}
+
+/**
+ * 创建新的聊天会话
+ */
+export function createChatConversation(studentId: string, title: string): ChatConversation {
+  const db = getDatabase();
+  const conversationId = `conv_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const result = db
+    .prepare('INSERT INTO chat_conversations (conversation_id, student_id, title) VALUES (?, ?, ?)')
+    .run(conversationId, studentId, title);
+  return {
+    id: result.lastInsertRowid as number,
+    conversationId,
+    studentId,
+    title,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 获取学生的所有聊天会话
+ */
+export function getChatConversations(studentId: string): ChatConversation[] {
+  const db = getDatabase();
+  return db
+    .prepare(
+      'SELECT id, conversation_id as conversationId, student_id as studentId, title, created_at as createdAt, updated_at as updatedAt FROM chat_conversations WHERE student_id = ? ORDER BY updated_at DESC'
+    )
+    .all(studentId) as ChatConversation[];
+}
+
+/**
+ * 获取单个聊天会话
+ */
+export function getChatConversation(conversationId: string): ChatConversation | null {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      'SELECT id, conversation_id as conversationId, student_id as studentId, title, created_at as createdAt, updated_at as updatedAt FROM chat_conversations WHERE conversation_id = ?'
+    )
+    .get(conversationId) as ChatConversation | undefined;
+  return row || null;
+}
+
+/**
+ * 更新会话标题
+ */
+export function updateChatConversationTitle(conversationId: string, title: string): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare("UPDATE chat_conversations SET title = ?, updated_at = datetime('now', 'localtime') WHERE conversation_id = ?")
+    .run(title, conversationId);
+  return result.changes > 0;
+}
+
+/**
+ * 更新会话时间
+ */
+export function touchChatConversation(conversationId: string): void {
+  const db = getDatabase();
+  db
+    .prepare("UPDATE chat_conversations SET updated_at = datetime('now', 'localtime') WHERE conversation_id = ?")
+    .run(conversationId);
+}
+
+/**
+ * 删除聊天会话
+ */
+export function deleteChatConversation(conversationId: string): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare('DELETE FROM chat_conversations WHERE conversation_id = ?')
+    .run(conversationId);
+  return result.changes > 0;
+}
+
+/**
+ * 添加聊天消息
+ */
+export function addChatMessage(
+  conversationId: string,
+  role: 'user' | 'assistant' | 'system',
+  content: string
+): ChatMessage {
+  const db = getDatabase();
+  const result = db
+    .prepare('INSERT INTO chat_messages (conversation_id, role, content) VALUES (?, ?, ?)')
+    .run(conversationId, role, content);
+  // 更新会话时间
+  touchChatConversation(conversationId);
+  return {
+    id: result.lastInsertRowid as number,
+    conversationId,
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 获取会话的所有消息
+ */
+export function getChatMessages(conversationId: string): ChatMessage[] {
+  const db = getDatabase();
+  return db
+    .prepare(
+      'SELECT id, conversation_id as conversationId, role, content, created_at as createdAt FROM chat_messages WHERE conversation_id = ? ORDER BY id ASC'
+    )
+    .all(conversationId) as ChatMessage[];
+}
+
+/**
+ * 删除会话的所有消息
+ */
+export function deleteChatMessages(conversationId: string): boolean {
+  const db = getDatabase();
+  const result = db
+    .prepare('DELETE FROM chat_messages WHERE conversation_id = ?')
+    .run(conversationId);
+  return result.changes > 0;
 }

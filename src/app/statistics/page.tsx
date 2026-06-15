@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { validateSession, getStudentEvaluations, getStudents, type Student, type EvaluationRecord } from '@/lib/auth';
+import { ProtectedLayout } from '@/components/protected-layout';
 
 interface Summary {
   totalCount: number;
@@ -380,7 +381,8 @@ export default function StatisticsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
+    <ProtectedLayout>
+      <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">我的学情统计</h1>
@@ -623,5 +625,6 @@ export default function StatisticsPage() {
         </div>
       </div>
     </div>
+    </ProtectedLayout>
   );
 }

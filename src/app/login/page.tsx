@@ -29,7 +29,7 @@ export default function LoginPage() {
         if (result.userType === 'admin') {
           router.push('/admin');
         } else {
-          router.push('/');
+          router.push('/practice');
         }
       }
     };
@@ -59,7 +59,7 @@ export default function LoginPage() {
           if (loginType === 'admin') {
             router.push('/admin');
           } else {
-            router.push('/');
+            router.push('/practice');
           }
         });
       } else {

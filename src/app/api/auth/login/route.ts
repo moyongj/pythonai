@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { validateAdminLogin, validateStudentLogin, createSession } from '@/lib/db';
 
-/**
- * 登录API
- * 支持管理员和学生登录
- */
 export async function POST(request: Request) {
   try {
     const { type, username, password } = await request.json();
@@ -19,12 +15,19 @@ export async function POST(request: Request) {
     if (type === 'admin') {
       if (validateAdminLogin(username, password)) {
         const sessionId = createSession('admin', username);
-        return NextResponse.json({
+        const response = NextResponse.json({
           success: true,
           sessionId,
           userType: 'admin',
           user: { username },
         });
+        response.cookies.set('mscz_session_id', sessionId, {
+          maxAge: 24 * 60 * 60,
+          path: '/',
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+        });
+        return response;
       } else {
         return NextResponse.json(
           { success: false, error: '管理员账号或密码错误' },
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
       const student = validateStudentLogin(username, password);
       if (student) {
         const sessionId = createSession('student', student.studentId);
-        return NextResponse.json({
+        const response = NextResponse.json({
           success: true,
           sessionId,
           userType: 'student',
@@ -46,6 +49,13 @@ export async function POST(request: Request) {
             class: student.class,
           },
         });
+        response.cookies.set('mscz_session_id', sessionId, {
+          maxAge: 24 * 60 * 60,
+          path: '/',
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+        });
+        return response;
       } else {
         return NextResponse.json(
           { success: false, error: '学号或密码错误' },

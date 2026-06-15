@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Code2, MessageSquareCode, BarChart3, LogOut, User, ShieldCheck } from 'lucide-react';
+import { Code2, MessageSquareCode, BarChart3, LogOut, User, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { validateSession, logout, type Student, type Admin } from '@/lib/auth';
 
@@ -15,8 +15,13 @@ const NAV_ITEMS = [
   },
   {
     label: '代码评价',
-    href: '/',
+    href: '/evaluate',
     icon: MessageSquareCode,
+  },
+  {
+    label: 'AI解惑',
+    href: '/chat',
+    icon: Sparkles,
   },
   {
     label: '学情统计',

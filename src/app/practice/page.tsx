@@ -6,6 +6,7 @@ import { Plus, Play, ChevronLeft, ChevronRight, Lightbulb, FileText, Terminal, E
 import { questions, type Question } from '@/data/python_questions';
 import { cn } from '@/lib/utils';
 import { validateSession, type Student } from '@/lib/auth';
+import { ProtectedLayout } from '@/components/protected-layout';
 
 const PAGE_SIZE = 10;
 const ANSWER_PASSWORD = 'mlszs';
@@ -124,7 +125,8 @@ export default function PracticePage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-8">
+    <ProtectedLayout>
+      <div className="mx-auto max-w-7xl px-6 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Python 试题演练</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -405,5 +407,6 @@ export default function PracticePage() {
         </div>
       )}
     </div>
+    </ProtectedLayout>
   );
 }
