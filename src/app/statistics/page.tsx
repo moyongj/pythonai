@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   Activity,
   Trophy,
@@ -12,6 +13,7 @@ import {
   Code,
   Quote,
   Sparkles,
+  FileText,
   Loader2,
   AlertTriangle,
   ChevronLeft,
@@ -26,6 +28,9 @@ import { cn } from '@/lib/utils';
 import { validateSession, getStudentEvaluations, getStudents, type Student, type EvaluationRecord } from '@/lib/auth';
 import { ProtectedLayout } from '@/components/protected-layout';
 
+/**
+ * 统计摘要接口
+ */
 interface Summary {
   totalCount: number;
   avgScore: number;
@@ -33,6 +38,9 @@ interface Summary {
   kpCount: number;
 }
 
+/**
+ * 分数分布项接口
+ */
 interface DistributionItem {
   range: string;
   count: number;
@@ -40,12 +48,18 @@ interface DistributionItem {
   text: string;
 }
 
+/**
+ * 知识点统计项接口
+ */
 interface TopKpItem {
   name: string;
   count: number;
   percent: number;
 }
 
+/**
+ * 最近记录接口
+ */
 interface RecentRecord {
   id: number;
   name: string;
@@ -56,6 +70,9 @@ interface RecentRecord {
   time: string;
 }
 
+/**
+ * 维度统计接口
+ */
 interface DimensionStats {
   understanding: number;
   logic: number;
@@ -63,6 +80,9 @@ interface DimensionStats {
   syntax: number;
 }
 
+/**
+ * 分页信息接口
+ */
 interface Pagination {
   page: number;
   limit: number;
@@ -70,6 +90,9 @@ interface Pagination {
   totalRecords: number;
 }
 
+/**
+ * 统计数据接口
+ */
 interface StatisticsData {
   summary: Summary;
   distribution: DistributionItem[];
@@ -79,6 +102,9 @@ interface StatisticsData {
   pagination: Pagination;
 }
 
+/**
+ * 知识点词云数据
+ */
 const WORDCLOUD = [
   { text: 'if 判断', size: 'text-2xl', weight: 'font-extrabold', color: 'text-primary' },
   { text: 'for 循环', size: 'text-xl', weight: 'font-bold', color: 'text-accent-pink' },
@@ -99,6 +125,9 @@ const WORDCLOUD = [
 
 /**
  * 根据等级获取徽章样式
+ * 
+ * @param {string} level - 等级：优秀、良好、及格、待提升
+ * @returns {string} Tailwind CSS样式类
  */
 function levelBadgeClass(level: string): string {
   if (level === '优秀') return 'bg-accent-green/15 text-accent-green';
@@ -237,6 +266,22 @@ function PaginationComponent({ pagination, onPageChange }: { pagination: Paginat
 }
 
 /**
+ * 解析报告字符串
+ */
+function parseReport(reportStr: string) {
+  try {
+    return JSON.parse(reportStr);
+  } catch {
+    try {
+      const jsonStr = reportStr.replace(/'/g, '"').replace(/"(\w+)":/g, '"$1":');
+      return JSON.parse(jsonStr);
+    } catch {
+      return null;
+    }
+  }
+}
+
+/**
  * 根据学情记录和学生数据生成统计数据
  */
 function generateMockData(evaluations: EvaluationRecord[], students: Student[]): StatisticsData {
@@ -253,26 +298,99 @@ function generateMockData(evaluations: EvaluationRecord[], students: Student[]):
     { range: '0-59', count: scores.filter(s => s < 60).length, color: 'bg-destructive', text: 'text-destructive' },
   ];
 
-  const topKp: TopKpItem[] = [
-    { name: '字典 — 创建字典大括号{}书写错误', count: 10, percent: 20 },
-    { name: 'for 循环 — 遍历列表/字符串', count: 10, percent: 20 },
-    { name: '字符串 — 切片起始/结束索引设置错误', count: 8, percent: 16 },
-    { name: '元组 — 单元素元组末尾缺失逗号', count: 8, percent: 16 },
-    { name: '列表 — insert() 指定位置插入', count: 8, percent: 16 },
-  ];
+  const kpCounts: Record<string, number> = {};
+  const kpCategories: Record<string, { subItems: { name: string; count: number }[]; totalCount: number }> = {};
+  let totalKpCount = 0;
+
+  evaluations.forEach(e => {
+    const report = parseReport(e.report);
+    if (report && report.knowledgePoints && Array.isArray(report.knowledgePoints)) {
+      report.knowledgePoints.forEach((kp: string) => {
+        kpCounts[kp] = (kpCounts[kp] || 0) + 1;
+        totalKpCount++;
+        
+        const parts = kp.split(' — ');
+        if (parts.length >= 2) {
+          const category = parts[0].trim();
+          const subItem = parts.slice(1).join(' — ').trim();
+          if (!kpCategories[category]) {
+            kpCategories[category] = { subItems: [], totalCount: 0 };
+          }
+          const existingSubItem = kpCategories[category].subItems.find(s => s.name === subItem);
+          if (existingSubItem) {
+            existingSubItem.count++;
+          } else {
+            kpCategories[category].subItems.push({ name: subItem, count: 1 });
+          }
+          kpCategories[category].totalCount++;
+        } else {
+          const category = kp;
+          if (!kpCategories[category]) {
+            kpCategories[category] = { subItems: [], totalCount: 0 };
+          }
+          kpCategories[category].totalCount++;
+        }
+      });
+    }
+  });
+
+  const topKp: TopKpItem[] = Object.entries(kpCategories)
+    .map(([category, data]) => {
+      const sortedSubItems = data.subItems.sort((a, b) => b.count - a.count);
+      let name: string;
+      if (sortedSubItems.length > 0) {
+        const firstLineItems = sortedSubItems.slice(0, 2);
+        const secondLineItems = sortedSubItems.slice(2, 4);
+        let subItemsText = firstLineItems.map(s => s.name).join('、');
+        if (secondLineItems.length > 0) {
+          subItemsText += '\n' + secondLineItems.map(s => s.name).join('、');
+          if (sortedSubItems.length > 4) {
+            subItemsText += `等${sortedSubItems.length}项`;
+          }
+        }
+        name = `${category}——${subItemsText}`;
+      } else {
+        name = category;
+      }
+      return {
+        name,
+        count: data.totalCount,
+        percent: totalKpCount > 0 ? Math.round((data.totalCount / totalKpCount) * 100) : 0,
+      };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   const recentRecords: RecentRecord[] = evaluations.slice(0, 10).map(e => {
     const student = students.find(s => s.studentId === e.studentId);
     const level = e.score >= 85 ? '优秀' : e.score >= 70 ? '良好' : e.score >= 60 ? '及格' : '待提升';
+    const report = parseReport(e.report);
+    const kps = report && report.knowledgePoints && Array.isArray(report.knowledgePoints) 
+      ? report.knowledgePoints 
+      : [];
+    const kpText = kps.length > 0 ? kps.join('; ') : '无';
     return {
       id: e.id,
       name: student?.name || '未知学生',
       title: e.question.substring(0, 30) + (e.question.length > 30 ? '...' : ''),
       score: e.score,
       level,
-      kp: '基础语法',
+      kp: kpText.length > 20 ? kpText.substring(0, 20) + '...' : kpText,
       time: new Date(e.createdAt).toLocaleString(),
     };
+  });
+
+  let understandingSum = 0, logicSum = 0, readabilitySum = 0, syntaxSum = 0;
+  let validReports = 0;
+  evaluations.forEach(e => {
+    const report = parseReport(e.report);
+    if (report && typeof report.understandingScore === 'number') {
+      understandingSum += report.understandingScore;
+      logicSum += report.logicScore || 0;
+      readabilitySum += report.readabilityScore || 0;
+      syntaxSum += report.syntaxScore || 0;
+      validReports++;
+    }
   });
 
   return {
@@ -280,16 +398,22 @@ function generateMockData(evaluations: EvaluationRecord[], students: Student[]):
       totalCount,
       avgScore: parseFloat(avgScore.toFixed(1)),
       excellentRate: parseFloat(excellentRate.toFixed(1)),
-      kpCount: 112,
+      kpCount: totalKpCount || 112,
     },
     distribution,
-    topKp,
+    topKp: topKp.length > 0 ? topKp : [
+      { name: '字典 — 创建字典大括号{}书写错误', count: 0, percent: 0 },
+      { name: 'for 循环 — 遍历列表/字符串', count: 0, percent: 0 },
+      { name: '字符串 — 切片起始/结束索引设置错误', count: 0, percent: 0 },
+      { name: '元组 — 单元素元组末尾缺失逗号', count: 0, percent: 0 },
+      { name: '列表 — insert() 指定位置插入', count: 0, percent: 0 },
+    ],
     recentRecords,
     dimensionStats: {
-      understanding: 25,
-      logic: 21,
-      readability: 20,
-      syntax: 16,
+      understanding: validReports > 0 ? parseFloat((understandingSum / validReports).toFixed(1)) : 25,
+      logic: validReports > 0 ? parseFloat((logicSum / validReports).toFixed(1)) : 21,
+      readability: validReports > 0 ? parseFloat((readabilitySum / validReports).toFixed(1)) : 20,
+      syntax: validReports > 0 ? parseFloat((syntaxSum / validReports).toFixed(1)) : 16,
     },
     pagination: {
       page: 1,
@@ -301,8 +425,19 @@ function generateMockData(evaluations: EvaluationRecord[], students: Student[]):
 }
 
 /**
- * 学情统计页面组件
- * 展示学生的学习数据统计和分析
+ * 学情统计页面
+ * 
+ * 展示学生的学习数据统计和分析，包含：
+ * - 统计摘要卡片（总评价次数、平均分、优秀率、易错知识点）
+ * - 成绩分布柱状图
+ * - 四维度得分环形图
+ * - 知识点词云
+ * - 评价记录历史（分页展示）
+ * - 数据导出功能（CSV格式）
+ * 
+ * @page
+ * @author 码上成长项目组
+ * @version 1.0.0
  */
 export default function StatisticsPage() {
   const router = useRouter();
@@ -318,6 +453,97 @@ export default function StatisticsPage() {
   });
   const [students, setStudents] = useState<Student[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationRecord[]>([]);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportProgress, setReportProgress] = useState(0);
+
+  /**
+   * 一键生成学情诊断报告（带平滑进度条动画）
+   */
+  const handleGenerateReport = async () => {
+    setGeneratingReport(true);
+    setReportProgress(0);
+
+    let currentProgress = 0;
+    let stopAnimation = false;
+
+    /**
+     * 平滑动画：每80ms增长，直到达到目标值，进度为整数
+     */
+    const animateTo = (target: number, speed: number = 2) => {
+      return new Promise<void>((resolve) => {
+        const timer = setInterval(() => {
+          if (stopAnimation) {
+            clearInterval(timer);
+            resolve();
+            return;
+          }
+          currentProgress = Math.min(Math.round(currentProgress + speed), target);
+          setReportProgress(currentProgress);
+          if (currentProgress >= target) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 80);
+      });
+    };
+
+    try {
+      // 阶段1: 准备请求 (0 -> 25%)
+      await animateTo(25, 2);
+
+      // 阶段2: 发起API请求
+      const fetchPromise = fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evaluations,
+          students,
+          filters: searchFilters,
+        })
+      });
+
+      // 并行：等待请求响应的同时，进度条缓慢增长到 70%
+      const [response] = await Promise.all([
+        fetchPromise,
+        animateTo(70, 1)
+      ]);
+
+      if (!response.ok) {
+        throw new Error('生成报告失败');
+      }
+
+      // 阶段3: 处理响应数据 (70 -> 90%)
+      const blobPromise = response.blob();
+      await Promise.all([
+        blobPromise,
+        animateTo(90, 2)
+      ]);
+
+      const blob = await blobPromise;
+
+      // 阶段4: 触发下载 (90 -> 100%)
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `My_Learning_Report_${new Date().toISOString().slice(0, 10)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      await animateTo(100, 3);
+      toast.success('学情诊断报告生成成功！');
+    } catch (error) {
+      console.error('生成报告失败:', error);
+      toast.error('生成报告失败，请稍后重试');
+    } finally {
+      stopAnimation = true;
+      setTimeout(() => {
+        setGeneratingReport(false);
+        setReportProgress(0);
+      }, 1000);
+    }
+  };
 
   /**
    * 页面初始化时验证session并加载数据
@@ -382,26 +608,33 @@ export default function StatisticsPage() {
 
   return (
     <ProtectedLayout>
-      <div className="mx-auto max-w-6xl px-6 py-8 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">我的学情统计</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-lg font-bold text-foreground sm:text-xl md:text-2xl">我的学情统计</h1>
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
             {currentUser.user.name}（{currentUser.user.class}）的学习数据分析
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => setShowSearch(!showSearch)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+              'flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm',
               showSearch
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-foreground hover:bg-primary/10'
             )}
           >
-            <Search className="h-4 w-4" />
+            <Search className="h-3.5 w-3.5" />
             {showSearch ? '隐藏搜索' : '搜索筛选'}
+          </button>
+          <button
+            onClick={() => handleGenerateReport()}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-float transition-all hover:opacity-90 sm:px-4 sm:text-sm"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            一键生成学情诊断报告
           </button>
           <button
             onClick={() => {
@@ -414,33 +647,33 @@ export default function StatisticsPage() {
               link.download = '我的学情记录.csv';
               link.click();
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-green px-4 py-2 text-sm font-semibold text-white shadow-float transition-all hover:opacity-90"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent-green px-3 py-2 text-xs font-semibold text-white shadow-float transition-all hover:opacity-90 sm:px-4 sm:text-sm"
           >
-            <Download className="h-4 w-4" />
-            导出我的记录
+            <Download className="h-3.5 w-3.5" />
+            导出记录
           </button>
         </div>
       </div>
 
       {showSearch && (
-        <div className="rounded-xl bg-card p-5 shadow-card">
-          <h3 className="mb-4 flex items-center gap-1.5 text-base font-semibold text-foreground">
-            <Search className="h-4 w-4 text-primary" />
+        <div className="rounded-xl bg-card p-4 shadow-card sm:p-5">
+          <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground sm:text-base">
+            <Search className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
             搜索筛选
           </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">学生姓名</label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground sm:text-sm">学生姓名</label>
               <select
                 value={searchFilters.studentName}
                 onChange={(e) => setSearchFilters({ ...searchFilters, studentName: e.target.value })}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 sm:px-3 sm:py-2 sm:text-sm"
               >
                 <option value="">{currentUser.user.name}</option>
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">最低分数</label>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground sm:text-sm">最低分数</label>
               <input
                 type="number"
                 min="0"
@@ -448,11 +681,11 @@ export default function StatisticsPage() {
                 value={searchFilters.minScore}
                 onChange={(e) => setSearchFilters({ ...searchFilters, minScore: e.target.value })}
                 placeholder="0"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 sm:px-3 sm:py-2 sm:text-sm"
               />
             </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">最高分数</label>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-foreground sm:text-sm">最高分数</label>
               <input
                 type="number"
                 min="0"
@@ -460,11 +693,11 @@ export default function StatisticsPage() {
                 value={searchFilters.maxScore}
                 onChange={(e) => setSearchFilters({ ...searchFilters, maxScore: e.target.value })}
                 placeholder="100"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 sm:px-3 sm:py-2 sm:text-sm"
               />
             </div>
           </div>
-          <div className="mt-4 flex items-center gap-2">
+          <div className="mt-3 flex items-center gap-2 sm:mt-4">
             <button
               onClick={() => {
                 let filtered = evaluations;
@@ -472,9 +705,9 @@ export default function StatisticsPage() {
                 if (searchFilters.maxScore) filtered = filtered.filter(e => e.score <= parseInt(searchFilters.maxScore));
                 setData(generateMockData(filtered, students));
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-float transition-all hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-float transition-all hover:opacity-90 sm:px-4 sm:py-2 sm:text-sm"
             >
-              <Search className="h-4 w-4" />
+              <Search className="h-3.5 w-3.5" />
               搜索
             </button>
             <button
@@ -482,27 +715,27 @@ export default function StatisticsPage() {
                 setSearchFilters({ studentName: '', minScore: '', maxScore: '' });
                 setData(generateMockData(evaluations, students));
               }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/80 sm:px-4 sm:py-2 sm:text-sm"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
               清除
             </button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {SUMMARY.map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="flex items-center gap-4 rounded-xl bg-card p-5 shadow-card transition-transform hover:-translate-y-0.5">
-              <div className={cn('flex h-12 w-12 items-center justify-center rounded-xl', item.bg)}>
-                <Icon className={cn('h-6 w-6', item.text)} />
+            <div key={item.label} className="flex items-center gap-3 rounded-xl bg-card p-3 shadow-card transition-transform hover:-translate-y-0.5 sm:p-4 lg:p-5">
+              <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg sm:h-12 sm:w-12', item.bg)}>
+                <Icon className={cn('h-5 w-5 sm:h-6 sm:w-6', item.text)} />
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">{item.label}</div>
                 <div className="mt-0.5 flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-foreground">{item.value}</span>
+                  <span className="text-lg font-bold text-foreground sm:text-xl lg:text-2xl">{item.value}</span>
                   <span className="text-xs text-muted-foreground">{item.suffix}</span>
                 </div>
               </div>
@@ -511,19 +744,19 @@ export default function StatisticsPage() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
-        <div className="rounded-xl bg-card p-5 shadow-card lg:col-span-3">
-          <h3 className="mb-5 flex items-center gap-1.5 text-base font-semibold text-foreground">
-            <BarChart3 className="h-4 w-4 text-primary" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="flex flex-col rounded-xl bg-card p-4 shadow-card lg:col-span-3 sm:p-5" style={{ minHeight: '280px' }}>
+          <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-foreground sm:mb-5 sm:text-base">
+            <BarChart3 className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
             成绩分布
           </h3>
-          <div className="flex h-56 items-end gap-4">
+          <div className="flex-1 flex items-end gap-2 sm:gap-4">
             {data.distribution.map((bar) => {
               const heightPct = maxCount > 0 ? (bar.count / maxCount) * 100 : 0;
               return (
                 <div key={bar.range} className="flex flex-1 flex-col items-center gap-2">
                   <div className="text-xs font-semibold text-foreground">{bar.count}次</div>
-                  <div className="flex h-44 w-full items-end overflow-hidden rounded-t-md bg-muted">
+                  <div className="flex h-20 w-full items-end overflow-hidden rounded-t-md bg-muted sm:h-64">
                     <div className={cn('w-full rounded-t-md transition-all', bar.color)} style={{ height: `${heightPct}%` }} />
                   </div>
                   <div className={cn('text-xs font-medium', bar.text)}>{bar.range}</div>
@@ -533,73 +766,73 @@ export default function StatisticsPage() {
           </div>
         </div>
 
-        <div className="rounded-xl bg-card p-5 shadow-card lg:col-span-2">
-          <h3 className="mb-5 flex items-center justify-between text-base font-semibold text-foreground">
+        <div className="rounded-xl bg-card p-4 shadow-card lg:col-span-2 sm:p-5">
+          <h3 className="mb-4 flex items-center justify-between text-sm font-semibold text-foreground sm:mb-5 sm:text-base">
             <span className="flex items-center gap-1.5">
-              <Code className="h-4 w-4 text-accent-pink" />
+              <Code className="h-3.5 w-3.5 text-accent-pink sm:h-4 sm:w-4" />
               易错知识点 TOP 5
             </span>
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {data.topKp.map((kp, idx) => (
-              <div key={kp.name} className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{idx + 1}</span>
-                  <span className="truncate text-sm font-medium text-foreground">{kp.name}</span>
+              <div key={idx} className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-2">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary sm:h-5 sm:w-5">{idx + 1}</span>
+                  <span className="whitespace-pre-wrap break-all text-xs font-medium text-foreground sm:text-sm leading-relaxed">{kp.name}</span>
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-muted-foreground">{kp.count} 次</span>
+                <span className="shrink-0 text-xs font-semibold text-muted-foreground pt-0.5">{kp.count} 次</span>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl bg-card p-5 shadow-card">
-        <h3 className="mb-5 flex items-center gap-1.5 text-base font-semibold text-foreground">
-          <TrendingUp className="h-4 w-4 text-accent-green" />
+      <div className="rounded-xl bg-card p-4 shadow-card sm:p-5">
+        <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-foreground sm:mb-5 sm:text-base">
+          <TrendingUp className="h-3.5 w-3.5 text-accent-green sm:h-4 sm:w-4" />
           四维度平均得分
         </h3>
-        <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {DIMENSIONS.map((dim) => (
             <RingProgress key={dim.name} percent={(dim.score / dim.full) * 100} color={dim.ring} label={dim.name} value={`${dim.score} / ${dim.full}`} />
           ))}
         </div>
       </div>
 
-      <div className="rounded-xl bg-card p-5 shadow-card">
-        <h3 className="mb-5 flex items-center justify-between text-base font-semibold text-foreground">
+      <div className="rounded-xl bg-card p-4 shadow-card sm:p-5">
+        <h3 className="mb-4 flex items-center justify-between text-sm font-semibold text-foreground sm:mb-5 sm:text-base">
           <span className="flex items-center gap-1.5">
-            <Code className="h-4 w-4 text-primary" />
+            <Code className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
             我的评价记录
           </span>
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-xs sm:text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="py-2.5 pr-4">题目</th>
-                <th className="py-2.5 pr-4">总分</th>
-                <th className="py-2.5 pr-4">等级</th>
-                <th className="py-2.5">评价时间</th>
+              <tr className="border-b border-border text-left text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">
+                <th className="py-2 pr-3 sm:py-2.5 sm:pr-4">题目</th>
+                <th className="py-2 pr-3 sm:py-2.5 sm:pr-4">总分</th>
+                <th className="py-2 pr-3 sm:py-2.5 sm:pr-4">等级</th>
+                <th className="py-2 sm:py-2.5">评价时间</th>
               </tr>
             </thead>
             <tbody>
               {data.recentRecords.length > 0 ? (
                 data.recentRecords.map((rec) => (
                   <tr key={rec.id} className="border-b border-border/50 last:border-0 hover:bg-muted/40 transition-colors">
-                    <td className="py-3 pr-4 text-muted-foreground">{rec.title}</td>
-                    <td className="py-3 pr-4 font-bold text-foreground">{rec.score}</td>
-                    <td className="py-3 pr-4">
-                      <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', levelBadgeClass(rec.level))}>
+                    <td className="py-2 pr-3 text-muted-foreground sm:py-3 sm:pr-4">{rec.title}</td>
+                    <td className="py-2 pr-3 font-bold text-foreground sm:py-3 sm:pr-4">{rec.score}</td>
+                    <td className="py-2 pr-3 sm:py-3 sm:pr-4">
+                      <span className={cn('inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs', levelBadgeClass(rec.level))}>
                         {rec.level}
                       </span>
                     </td>
-                    <td className="py-3 text-muted-foreground">{rec.time}</td>
+                    <td className="py-2 text-muted-foreground sm:py-3">{rec.time}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-muted-foreground">暂无评价记录</td>
+                  <td colSpan={4} className="py-6 text-center text-muted-foreground sm:py-8">暂无评价记录</td>
                 </tr>
               )}
             </tbody>
@@ -607,24 +840,57 @@ export default function StatisticsPage() {
         </div>
       </div>
 
-      <div className="rounded-xl bg-card p-5 shadow-card">
-        <h3 className="mb-5 flex items-center gap-1.5 text-base font-semibold text-foreground">
-          <Quote className="h-4 w-4 text-amber-700" />
+      <div className="rounded-xl bg-card p-4 shadow-card sm:p-5">
+        <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-foreground sm:mb-5 sm:text-base">
+          <Quote className="h-3.5 w-3.5 text-amber-700 sm:h-4 sm:w-4" />
           知识点词云
         </h3>
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 py-6">
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-4 sm:gap-x-4 sm:gap-y-3 sm:py-6">
           {WORDCLOUD.map((w) => (
             <span key={w.text} className={cn('cursor-default transition-transform hover:-translate-y-0.5', w.size, w.weight, w.color)}>
               {w.text}
             </span>
           ))}
         </div>
-        <div className="mt-4 flex items-center justify-center gap-3 border-t border-border/50 pt-4 text-xs text-muted-foreground">
-          <Sparkles className="h-3 w-3" />
+        <div className="mt-3 flex items-center justify-center gap-2 border-t border-border/50 pt-3 text-[10px] text-muted-foreground sm:mt-4 sm:gap-3 sm:pt-4 sm:text-xs">
+          <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
           <span>字号代表知识点重要程度</span>
         </div>
       </div>
     </div>
+
+      {generatingReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="rounded-2xl bg-white p-8 shadow-2xl max-w-md w-full mx-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent-purple/20">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent-purple">
+                  <FileText className="h-7 w-7 text-white animate-pulse" />
+                </div>
+              </div>
+              <h2 className="mb-2 text-lg font-bold text-foreground">正在生成学情诊断报告</h2>
+              <p className="mb-6 text-sm text-muted-foreground">
+                正在分析学习数据并生成个性化报告，请稍候...
+              </p>
+              <div className="w-full">
+                <div className="mb-2 flex justify-between text-xs font-medium text-muted-foreground">
+                  <span>处理进度</span>
+                  <span>{reportProgress}%</span>
+                </div>
+                <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-accent-purple transition-all duration-100"
+                    style={{ width: `${reportProgress}%` }}
+                  />
+                </div>
+              </div>
+              <p className="mt-4 text-xs text-muted-foreground">
+                报告将自动下载到您的设备，可通过浏览器打开查看
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </ProtectedLayout>
   );
 }

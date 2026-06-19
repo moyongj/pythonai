@@ -5,6 +5,16 @@ import next from 'next';
 import dotenv from 'dotenv';
 import { initDb } from '@/lib/db';
 
+process.on('uncaughtException', (err) => {
+  console.error('[SERVER] Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[SERVER] Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 const envPath = path.resolve(process.cwd(), '.env');
 console.log('Loading .env from:', envPath);
 
@@ -12,12 +22,14 @@ dotenv.config({ path: envPath });
 
 console.log('DEEPSEEK_API_KEY:', process.env.DEEPSEEK_API_KEY ? '已加载' : '未加载');
 
-const dev = process.env.COZE_PROJECT_ENV !== 'PROD';
-const hostname = process.env.HOSTNAME || 'localhost';
+const dev = process.env.COZE_PROJECT_ENV === 'DEV' || process.env.NODE_ENV === 'development';
+const hostname = process.env.HOSTNAME || '0.0.0.0';
 const port = parseInt(process.env.PORT || '5000', 10);
 
 async function startServer() {
+  console.log('[SERVER] Initializing database...');
   await initDb();
+  console.log('[SERVER] Database initialized successfully');
   
   const app = next({ dev, hostname, port });
   const handle = app.getRequestHandler();

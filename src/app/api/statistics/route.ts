@@ -10,17 +10,46 @@ interface EvaluationRecord {
   question: string;
   code: string;
   report: string;
-  total_score: number;
-  understanding_score: number;
-  logic_score: number;
-  readability_score: number;
-  syntax_score: number;
-  level: string;
-  hint: string;
-  practice: string;
+  score: number;
   created_at: string;
   student_name?: string;
   student_class?: string;
+}
+
+/**
+ * 从数据库 report 字段（JSON字符串）安全解析四维度分数等信息。
+ * 数据库实际只存储 report JSON 和 score（总分），并不存在独立的
+ * understanding_score / logic_score / readability_score / syntax_score 字段。
+ */
+function safeParseReport(report: string | undefined | null) {
+  const empty = {
+    understanding: 0,
+    logic: 0,
+    readability: 0,
+    syntax: 0,
+    totalScore: 0,
+    level: '',
+    hint: '',
+    practice: '',
+    knowledgePoints: [] as string[],
+  };
+  if (!report) return empty;
+  try {
+    const obj = JSON.parse(report);
+    return {
+      understanding: typeof obj.understandingScore === 'number' ? obj.understandingScore : 0,
+      logic: typeof obj.logicScore === 'number' ? obj.logicScore : 0,
+      readability: typeof obj.readabilityScore === 'number' ? obj.readabilityScore : 0,
+      syntax: typeof obj.syntaxScore === 'number' ? obj.syntaxScore : 0,
+      totalScore: typeof obj.totalScore === 'number' ? obj.totalScore : 0,
+      level: typeof obj.level === 'string' ? obj.level : '',
+      hint: typeof obj.hint === 'string' ? obj.hint : '',
+      practice: typeof obj.practice === 'string' ? obj.practice : '',
+      knowledgePoints: Array.isArray(obj.knowledgePoints) ? obj.knowledgePoints : [],
+    };
+  } catch {
+    return empty;
+  }
 }
 
 export async function GET(request: Request) {
@@ -57,19 +86,20 @@ export async function GET(request: Request) {
       const worksheetData = records.map(r => {
         const date = new Date(r.created_at);
         const isValidDate = !isNaN(date.getTime());
+        const parsed = safeParseReport(r.report);
         return {
           '学生姓名': r.student_name || '',
           '班级': r.student_class || '',
           '题目': r.question || '',
           '代码': r.code || '',
-          '理解得分': r.understanding_score || 0,
-          '逻辑得分': r.logic_score || 0,
-          '可读性得分': r.readability_score || 0,
-          '语法得分': r.syntax_score || 0,
-          '总分': r.total_score || 0,
-          '等级': r.level || '',
-          '提示': r.hint || '',
-          '练习建议': r.practice || '',
+          '理解得分': parsed.understanding,
+          '逻辑得分': parsed.logic,
+          '可读性得分': parsed.readability,
+          '语法得分': parsed.syntax,
+          '总分': r.score || 0,
+          '等级': parsed.level,
+          '提示': parsed.hint,
+          '练习建议': parsed.practice,
           '评价时间': isValidDate ? date.toLocaleString('zh-CN') : '',
         };
       });
@@ -103,13 +133,15 @@ export async function GET(request: Request) {
       const searchRecordsData = paginatedRecords.map(r => {
         const date = new Date(r.created_at);
         const isValidDate = !isNaN(date.getTime());
+        const parsed = safeParseReport(r.report);
+        const kpText = parsed.knowledgePoints?.slice(0, 3).join(';') || '无';
         return {
           name: r.student_name || '未知',
           class: r.student_class || '',
           title: (r.question?.length > 20 ? r.question.substring(0, 20) + '...' : r.question) || '无标题',
-          score: r.total_score || 0,
-          level: r.level || '待提升',
-          kp: (r.hint?.length > 0 ? r.hint.substring(0, 20) : '无') || '无',
+          score: r.score || 0,
+          level: parsed.level || '待提升',
+          kp: kpText.length > 30 ? kpText.substring(0, 30) + '...' : kpText,
           time: isValidDate ? date.toLocaleString('zh-CN') : '未知时间',
         };
       });
@@ -165,22 +197,41 @@ export async function GET(request: Request) {
     const recentRecords = paginatedRecords.map(r => {
       const date = new Date(r.created_at);
       const isValidDate = !isNaN(date.getTime());
+      const parsed = safeParseReport(r.report);
+      const kpText = parsed.knowledgePoints?.slice(0, 3).join(';') || '无';
       return {
         name: r.student_name || '未知',
         class: r.student_class || '',
         title: (r.question?.length > 20 ? r.question.substring(0, 20) + '...' : r.question) || '无标题',
-        score: r.total_score || 0,
-        level: r.level || '待提升',
-        kp: (r.hint?.length > 0 ? r.hint.substring(0, 20) : '无') || '无',
+        score: r.score || 0,
+        level: parsed.level || '待提升',
+        kp: kpText.length > 30 ? kpText.substring(0, 30) + '...' : kpText,
         time: isValidDate ? date.toLocaleString('zh-CN') : '未知时间',
       };
     });
 
-    const dimensionStats = records.length > 0 ? {
-      understanding: Math.round(records.reduce((sum, r) => sum + (r.understanding_score || 0), 0) / records.length),
-      logic: Math.round(records.reduce((sum, r) => sum + (r.logic_score || 0), 0) / records.length),
-      readability: Math.round(records.reduce((sum, r) => sum + (r.readability_score || 0), 0) / records.length),
-      syntax: Math.round(records.reduce((sum, r) => sum + (r.syntax_score || 0), 0) / records.length),
+    // 四维度统计：从 report JSON 中提取 understandingScore 等，
+    // 计算原始分平均值（不是百分比）。前端按 "understanding/30" 等方式展示。
+    let totalUnderstanding = 0;
+    let totalLogic = 0;
+    let totalReadability = 0;
+    let totalSyntax = 0;
+    let validCount = 0;
+    for (const r of records) {
+      const parsed = safeParseReport(r.report);
+      if (parsed.understanding || parsed.logic || parsed.readability || parsed.syntax) {
+        totalUnderstanding += parsed.understanding;
+        totalLogic += parsed.logic;
+        totalReadability += parsed.readability;
+        totalSyntax += parsed.syntax;
+        validCount++;
+      }
+    }
+    const dimensionStats = validCount > 0 ? {
+      understanding: Math.round((totalUnderstanding / validCount) * 10) / 10,
+      logic: Math.round((totalLogic / validCount) * 10) / 10,
+      readability: Math.round((totalReadability / validCount) * 10) / 10,
+      syntax: Math.round((totalSyntax / validCount) * 10) / 10,
     } : { understanding: 0, logic: 0, readability: 0, syntax: 0 };
 
     return NextResponse.json({

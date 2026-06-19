@@ -186,6 +186,38 @@ function matchKnowledgePoints(inputKps: string[]): string[] {
   return matched.slice(0, 5);
 }
 
+function analyzeKnowledgePointsFromCode(code: string): string[] {
+  const matched: string[] = [];
+  const used = new Set<number>();
+  const codeLower = code.toLowerCase();
+
+  for (let i = 0; i < KNOWLEDGE_POINTS.length; i++) {
+    if (used.has(i)) continue;
+    if (matched.length >= 5) break;
+
+    const kp = KNOWLEDGE_POINTS[i];
+    const kpPart = kp.split(' — ')[1]?.toLowerCase() || '';
+
+    const kpWords = kpPart.replace(/[(){}[\]<>，,。.、；;！!？?]/g, ' ').split(/\s+/).filter(word => word.length > 2);
+    
+    if (kpWords.length === 0) continue;
+
+    let matchCount = 0;
+    for (const word of kpWords) {
+      if (codeLower.includes(word)) {
+        matchCount++;
+      }
+    }
+
+    if (matchCount >= Math.ceil(kpWords.length * 0.5) || matchCount >= 2) {
+      matched.push(kp);
+      used.add(i);
+    }
+  }
+
+  return matched;
+}
+
 const SYSTEM_PROMPT = `你是一位资深 Python 教师，正在为中职学生批改代码作业。你的评价风格是**鼓励式 + 具体化**：不直接给答案，而是用提示引导学生自己发现错误。
 
 【评分维度与标准】
@@ -377,7 +409,12 @@ export async function POST(request: NextRequest) {
           .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
           .map((v) => v.trim())
       : [];
-    const knowledgePoints = matchKnowledgePoints(rawKnowledgePoints);
+    
+    let knowledgePoints = matchKnowledgePoints(rawKnowledgePoints);
+    
+    if (knowledgePoints.length === 0 && code) {
+      knowledgePoints = analyzeKnowledgePointsFromCode(code);
+    }
 
     const level =
       total >= 85

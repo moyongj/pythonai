@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { 
   LogOut, Users, FileText, BarChart3, Upload, Plus, Trash2, Edit, 
-  Save, X, Search, Download, ChevronLeft, ChevronRight, ShieldCheck, TrendingUp
+  Save, X, Search, Download, ChevronLeft, ChevronRight, ShieldCheck, TrendingUp, BookOpen, Menu
 } from 'lucide-react';
 import {
   validateSession,
@@ -25,12 +25,25 @@ import {
   type QuestionItem,
 } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { Footer } from '@/components/footer';
 
+/**
+ * 标签页类型枚举
+ */
 type TabType = 'students' | 'questions' | 'evaluations';
 
 /**
- * 管理员后台页面组件
- * 提供学生管理、题库管理、学情记录管理功能
+ * 管理员后台页面
+ * 
+ * 提供完整的后台管理功能，包含：
+ * - 学生管理：批量导入（Excel）、编辑、删除学生信息
+ * - 题库管理：添加、编辑、删除练习题
+ * - 学情记录：查看所有学生的评价记录
+ * - 数据统计：班级级别数据统计分析
+ * 
+ * @page
+ * @author 码上成长项目组
+ * @version 1.0.0
  */
 export default function AdminPage() {
   const router = useRouter();
@@ -47,6 +60,7 @@ export default function AdminPage() {
   };
 
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [evaluations, setEvaluations] = useState<EvaluationRecord[]>([]);
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
@@ -336,95 +350,167 @@ export default function AdminPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="mx-auto max-w-7xl px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold text-foreground">管理员后台</span>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary sm:w-6 sm:h-6" />
+              <span className="text-base font-bold text-foreground sm:text-lg">管理员后台</span>
             </div>
-            <nav className="flex items-center gap-2">
+            <nav className="hidden md:flex items-center gap-1 sm:gap-2">
               <button
                 onClick={() => { setActiveTab('students'); }}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                   activeTab === 'students'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
-                <Users className="w-4 h-4" />
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 学生管理
               </button>
               <button
                 onClick={() => { setActiveTab('questions'); }}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                   activeTab === 'questions'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 题库管理
               </button>
               <button
                 onClick={() => { setActiveTab('evaluations'); }}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:text-sm',
                   activeTab === 'evaluations'
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 )}
               >
-                <BarChart3 className="w-4 h-4" />
+                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 学情记录
               </button>
               <a
                 href="/admin/statistics"
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-3 sm:text-sm"
               >
-                <TrendingUp className="w-4 h-4" />
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 学情分析
+              </a>
+              <a
+                href="/admin/resources"
+                className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-3 sm:text-sm"
+              >
+                <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                学习资源
               </a>
             </nav>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <LogOut className="w-4 h-4" />
-            退出登录
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center justify-center rounded-lg p-2 text-muted-foreground md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-3 sm:py-2 sm:text-sm"
+            >
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              退出
+            </button>
+          </div>
         </div>
+        {/* 移动端导航菜单 */}
+        {mobileMenuOpen && (
+          <nav className="md:hidden border-t border-border bg-card px-4 py-2 space-y-1">
+            <button
+              onClick={() => { setActiveTab('students'); setMobileMenuOpen(false); }}
+              className={cn(
+                'flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                activeTab === 'students'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              <Users className="w-4 h-4" />
+              学生管理
+            </button>
+            <button
+              onClick={() => { setActiveTab('questions'); setMobileMenuOpen(false); }}
+              className={cn(
+                'flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                activeTab === 'questions'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              <FileText className="w-4 h-4" />
+              题库管理
+            </button>
+            <button
+              onClick={() => { setActiveTab('evaluations'); setMobileMenuOpen(false); }}
+              className={cn(
+                'flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                activeTab === 'evaluations'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted'
+              )}
+            >
+              <BarChart3 className="w-4 h-4" />
+              学情记录
+            </button>
+            <a
+              href="/admin/statistics"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <TrendingUp className="w-4 h-4" />
+              学情分析
+            </a>
+            <a
+              href="/admin/resources"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <BookOpen className="w-4 h-4" />
+              学习资源
+            </a>
+          </nav>
+        )}
       </header>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {/* Search */}
-        <div className="mb-4">
+        <div className="mb-3 sm:mb-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索..."
-              className="w-full max-w-md rounded-lg border border-border bg-background pl-10 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full rounded-lg border border-border bg-background pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:max-w-md sm:pr-4"
             />
           </div>
         </div>
 
         {/* Students Tab */}
         {activeTab === 'students' && (
-          <div className="rounded-xl bg-card shadow-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-foreground">学生列表</h2>
-              <div className="flex items-center gap-2">
+          <div className="rounded-xl bg-card shadow-card p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3 sm:mb-4">
+              <h2 className="text-base font-semibold text-foreground sm:text-lg">学生列表</h2>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={exportStudentsToExcel}
-                  className="flex items-center gap-2 rounded-lg bg-accent-green/10 px-4 py-2 text-sm font-medium text-accent-green transition-colors hover:bg-accent-green hover:text-white"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-accent-green/10 px-3 py-1.5 text-xs font-medium text-accent-green transition-colors hover:bg-accent-green hover:text-white sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="w-3.5 h-3.5" />
                   导出Excel
                 </button>
                 <input
@@ -436,112 +522,112 @@ export default function AdminPage() {
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
+                  className="flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-all hover:opacity-90 sm:px-4 sm:py-2 sm:text-sm"
                 >
-                  <Upload className="w-4 h-4" />
+                  <Upload className="w-3.5 h-3.5" />
                   导入Excel
                 </button>
               </div>
             </div>
 
-            <p className="text-xs text-muted-foreground mb-4">
+            <p className="text-xs text-muted-foreground mb-3 sm:mb-4">
               Excel格式：班级、学生姓名、学号、密码（可选，默认123456）
             </p>
 
             {filteredStudents.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-8 text-muted-foreground sm:py-12">
                 {students.length === 0 ? '暂无学生数据，请通过Excel导入' : '没有找到匹配的学生'}
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-xs sm:text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">班级</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">姓名</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">学号</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">密码</th>
-                      <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">操作</th>
+                      <th className="text-left py-2 px-3 text-[10px] font-medium text-muted-foreground sm:py-3 sm:px-4 sm:text-xs">班级</th>
+                      <th className="text-left py-2 px-3 text-[10px] font-medium text-muted-foreground sm:py-3 sm:px-4 sm:text-xs">姓名</th>
+                      <th className="text-left py-2 px-3 text-[10px] font-medium text-muted-foreground sm:py-3 sm:px-4 sm:text-xs">学号</th>
+                      <th className="text-left py-2 px-3 text-[10px] font-medium text-muted-foreground sm:py-3 sm:px-4 sm:text-xs">密码</th>
+                      <th className="text-left py-2 px-3 text-[10px] font-medium text-muted-foreground sm:py-3 sm:px-4 sm:text-xs">操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {paginatedStudents.map((student) => (
                       <tr key={student.id} className="border-b border-border/50">
-                        <td className="py-3 px-4">
+                        <td className="py-2 px-3 sm:py-3 sm:px-4">
                           {editingItem === student.id ? (
                             <input
                               value={editData.class}
                               onChange={(e) => setEditData({ ...editData, class: e.target.value })}
-                              className="w-full rounded border border-border px-2 py-1 text-sm"
+                              className="w-full rounded border border-border px-1.5 py-1 text-xs"
                             />
                           ) : (
-                            <span className="text-sm text-foreground">{student.class}</span>
+                            <span className="text-xs text-foreground sm:text-sm">{student.class}</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2 px-3 sm:py-3 sm:px-4">
                           {editingItem === student.id ? (
                             <input
                               value={editData.name}
                               onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                              className="w-full rounded border border-border px-2 py-1 text-sm"
+                              className="w-full rounded border border-border px-1.5 py-1 text-xs"
                             />
                           ) : (
-                            <span className="text-sm text-foreground">{student.name}</span>
+                            <span className="text-xs text-foreground sm:text-sm">{student.name}</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2 px-3 sm:py-3 sm:px-4">
                           {editingItem === student.id ? (
                             <input
                               value={editData.studentId}
                               onChange={(e) => setEditData({ ...editData, studentId: e.target.value })}
-                              className="w-full rounded border border-border px-2 py-1 text-sm"
+                              className="w-full rounded border border-border px-1.5 py-1 text-xs"
                             />
                           ) : (
-                            <span className="text-sm text-foreground">{student.studentId}</span>
+                            <span className="text-xs text-foreground sm:text-sm">{student.studentId}</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
+                        <td className="py-2 px-3 sm:py-3 sm:px-4">
                           {editingItem === student.id ? (
                             <input
                               value={editData.password}
                               onChange={(e) => setEditData({ ...editData, password: e.target.value })}
                               placeholder="留空则不修改"
-                              className="w-full rounded border border-border px-2 py-1 text-sm"
+                              className="w-full rounded border border-border px-1.5 py-1 text-xs"
                             />
                           ) : (
-                            <span className="text-sm text-muted-foreground">******</span>
+                            <span className="text-xs text-muted-foreground">******</span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
+                        <td className="py-2 px-3 sm:py-3 sm:px-4">
+                          <div className="flex items-center gap-1">
                             {editingItem === student.id ? (
                               <>
                                 <button
                                   onClick={() => handleSaveEditStudent(student.id)}
-                                  className="rounded p-1.5 text-accent-green hover:bg-accent-green/10"
+                                  className="rounded p-1 text-accent-green hover:bg-accent-green/10"
                                 >
-                                  <Save className="w-4 h-4" />
+                                  <Save className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => { setEditingItem(null); setEditData({}); }}
-                                  className="rounded p-1.5 text-muted-foreground hover:bg-muted"
+                                  className="rounded p-1 text-muted-foreground hover:bg-muted"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <X className="w-3.5 h-3.5" />
                                 </button>
                               </>
                             ) : (
                               <>
                                 <button
                                   onClick={() => handleStartEditStudent(student)}
-                                  className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                                 >
-                                  <Edit className="w-4 h-4" />
+                                  <Edit className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteStudent(student.id)}
-                                  className="rounded p-1.5 text-destructive hover:bg-destructive/10"
+                                  className="rounded p-1 text-destructive hover:bg-destructive/10"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </>
                             )}
@@ -551,14 +637,14 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                <div className="mt-4 flex flex-col items-center">
+                <div className="mt-3 flex flex-col items-center sm:mt-4">
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleStudentPageChange(studentCurrentPage - 1)}
                       disabled={studentCurrentPage === 1}
-                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none sm:px-3 sm:py-1.5 sm:text-sm"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
                     {Array.from({ length: Math.min(5, Math.ceil(filteredStudents.length / 10)) }, (_, i) => {
                       const totalPages = Math.ceil(filteredStudents.length / 10);
@@ -571,7 +657,7 @@ export default function AdminPage() {
                           key={pageNum}
                           onClick={() => handleStudentPageChange(pageNum)}
                           className={cn(
-                            "min-w-8 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                            "min-w-6 rounded-md px-2 py-1 text-xs font-medium transition-colors sm:min-w-8 sm:px-3 sm:py-1.5 sm:text-sm",
                             studentCurrentPage === pageNum
                               ? "bg-primary text-primary-foreground"
                               : "border border-border bg-background text-foreground hover:bg-muted"
@@ -584,12 +670,12 @@ export default function AdminPage() {
                     <button
                       onClick={() => handleStudentPageChange(studentCurrentPage + 1)}
                       disabled={studentCurrentPage === Math.ceil(filteredStudents.length / 10)}
-                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+                      className="inline-flex items-center justify-center rounded-md border border-border bg-background px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none sm:px-3 sm:py-1.5 sm:text-sm"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="mt-2 text-center text-xs text-muted-foreground">
+                  <div className="mt-2 text-center text-[10px] text-muted-foreground sm:text-xs">
                     第 {studentCurrentPage} / {Math.ceil(filteredStudents.length / 10)} 页，共 {filteredStudents.length} 条记录
                   </div>
                 </div>
@@ -778,9 +864,9 @@ export default function AdminPage() {
                         {evaluation.code}
                       </pre>
                     </div>
-                    <div>
+                    <div className="break-all">
                       <span className="text-xs text-muted-foreground">评价报告：</span>
-                      <p className="text-sm text-foreground mt-1">{evaluation.report}</p>
+                      <p className="text-xs text-foreground mt-1 sm:text-sm break-all whitespace-pre-wrap">{evaluation.report}</p>
                     </div>
                   </div>
                 ))}
@@ -789,6 +875,8 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      <Footer />
     </div>
   );
 }

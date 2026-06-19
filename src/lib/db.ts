@@ -1,13 +1,25 @@
 /**
  * SQLite数据库模块
- * 使用better-sqlite3进行数据持久化存储
+ * 
+ * 本模块负责管理整个应用的数据库操作，使用better-sqlite3进行数据持久化存储。
+ * 包含数据库连接管理、表结构初始化、以及管理员、学生、学情记录、题库、会话等数据的CRUD操作。
+ * 
+ * @module db
+ * @author 码上成长项目组
+ * @version 1.0.0
  */
 
 import Database from 'better-sqlite3';
 import path from 'path';
 
+/**
+ * 数据库文件路径
+ */
 const DB_PATH = path.join(process.cwd(), 'data', 'mscz.db');
 
+/**
+ * 数据库连接实例（单例模式）
+ */
 let db: Database.Database | null = null;
 
 const INITIAL_QUESTIONS = [
@@ -115,11 +127,19 @@ const INITIAL_QUESTIONS = [
 
 /**
  * 获取数据库连接（单例模式）
+ * 
+ * 确保整个应用只有一个数据库连接实例，避免资源浪费。
+ * 如果连接尚未建立，则创建新连接并初始化表结构。
+ * 
+ * @returns {Database.Database} SQLite数据库连接实例
  */
 export function getDatabase(): Database.Database {
   if (!db) {
+    // 创建数据库连接
     db = new Database(DB_PATH);
+    // 启用WAL模式以提高并发性能
     db.pragma('journal_mode = WAL');
+    // 初始化表结构
     initTables(db);
   }
   return db;
@@ -127,6 +147,11 @@ export function getDatabase(): Database.Database {
 
 /**
  * 初始化数据库表结构
+ * 
+ * 创建所需的所有表：admin、students、evaluations、questions、sessions、
+ * chat_conversations、chat_messages，并在首次运行时插入初始数据。
+ * 
+ * @param {Database.Database} db - 数据库连接实例
  */
 function initTables(db: Database.Database): void {
   db.exec(`
@@ -191,6 +216,15 @@ function initTables(db: Database.Database): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       FOREIGN KEY (conversation_id) REFERENCES chat_conversations(conversation_id)
     );
+
+    CREATE TABLE IF NOT EXISTS learning_resources (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL,
+      description TEXT,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   const adminExists = db.prepare('SELECT COUNT(*) as count FROM admin').get() as { count: number };
@@ -207,6 +241,19 @@ function initTables(db: Database.Database): void {
       }
     });
     insertMany(INITIAL_QUESTIONS);
+  }
+
+  // 初始化默认学习资源
+  const resourcesExists = db.prepare('SELECT COUNT(*) as count FROM learning_resources').get() as { count: number };
+  if (resourcesExists.count === 0) {
+    const defaultResources = [
+      { title: 'Python基础教程', url: 'https://chatglm.cn/share/CFl9Gfpy', description: 'Python编程基础入门教程', sortOrder: 1 },
+      { title: 'Python进阶学习', url: 'https://chatglm.cn/share/yFlfMlXf', description: 'Python进阶知识学习资源', sortOrder: 2 },
+    ];
+    const insertResource = db.prepare('INSERT INTO learning_resources (title, url, description, sort_order) VALUES (?, ?, ?, ?)');
+    for (const resource of defaultResources) {
+      insertResource.run(resource.title, resource.url, resource.description, resource.sortOrder);
+    }
   }
 
   const studentsExists = db.prepare('SELECT COUNT(*) as count FROM students').get() as { count: number };
@@ -264,13 +311,34 @@ function initTables(db: Database.Database): void {
 
 /**
  * 初始化数据库（用于服务器启动时调用）
+ *
+ * 确保数据库连接已建立，表结构已初始化。
  */
 export async function initDb(): Promise<void> {
   getDatabase();
 }
 
 /**
+ * 检查数据库是否就绪
+ * 
+ * 尝试连接数据库并检查必要的表是否存在。
+ * 
+ * @returns {boolean} 数据库是否就绪
+ */
+export function isDatabaseReady(): boolean {
+  try {
+    const db = getDatabase();
+    const result = db.prepare('SELECT COUNT(*) as count FROM admin').get() as { count: number };
+    return result !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 关闭数据库连接
+ * 
+ * 释放数据库资源，应在应用关闭时调用。
  */
 export function closeDatabase(): void {
   if (db) {
@@ -279,32 +347,57 @@ export function closeDatabase(): void {
   }
 }
 
-/* ========== 管理员操作 ========== */
+/* ========== 管理员操作模块 ========== */
 
+/**
+ * 管理员接口定义
+ */
 export interface Admin {
   username: string;
   password: string;
 }
 
+/**
+ * 获取管理员信息
+ * 
+ * @returns {Admin | null} 管理员信息，若无则返回null
+ */
 export function getAdmin(): Admin | null {
   const db = getDatabase();
   const row = db.prepare('SELECT username, password FROM admin LIMIT 1').get() as Admin | undefined;
   return row || null;
 }
 
+/**
+ * 验证管理员登录
+ * 
+ * @param {string} username - 用户名
+ * @param {string} password - 密码
+ * @returns {boolean} 验证是否成功
+ */
 export function validateAdminLogin(username: string, password: string): boolean {
   const admin = getAdmin();
   return admin !== null && admin.username === username && admin.password === password;
 }
 
+/**
+ * 更新管理员密码
+ * 
+ * @param {string} username - 用户名
+ * @param {string} newPassword - 新密码
+ * @returns {boolean} 更新是否成功
+ */
 export function updateAdminPassword(username: string, newPassword: string): boolean {
   const db = getDatabase();
   const result = db.prepare('UPDATE admin SET password = ? WHERE username = ?').run(newPassword, username);
   return result.changes > 0;
 }
 
-/* ========== 学生操作 ========== */
+/* ========== 学生操作模块 ========== */
 
+/**
+ * 学生信息接口定义
+ */
 export interface Student {
   id: number;
   studentId: string;
@@ -314,17 +407,34 @@ export interface Student {
   createdAt: string;
 }
 
+/**
+ * 获取所有学生列表
+ * 
+ * @returns {Student[]} 学生列表数组
+ */
 export function getStudents(): Student[] {
   const db = getDatabase();
   return db.prepare('SELECT id, student_id as studentId, name, class, password, created_at as createdAt FROM students ORDER BY created_at DESC').all() as Student[];
 }
 
+/**
+ * 根据学号获取学生信息
+ * 
+ * @param {string} studentId - 学生学号
+ * @returns {Student | null} 学生信息，若无则返回null
+ */
 export function getStudentById(studentId: string): Student | null {
   const db = getDatabase();
   const row = db.prepare('SELECT id, student_id as studentId, name, class, password, created_at as createdAt FROM students WHERE student_id = ?').get(studentId) as Student | undefined;
   return row || null;
 }
 
+/**
+ * 添加单个学生
+ * 
+ * @param {{ studentId: string; name: string; class: string; password: string }} student - 学生信息
+ * @returns {Student} 添加后的学生对象
+ */
 export function addStudent(student: { studentId: string; name: string; class: string; password: string }): Student {
   const db = getDatabase();
   const result = db.prepare('INSERT INTO students (student_id, name, class, password) VALUES (?, ?, ?, ?)').run(student.studentId, student.name, student.class, student.password);
@@ -335,6 +445,14 @@ export function addStudent(student: { studentId: string; name: string; class: st
   };
 }
 
+/**
+ * 批量添加学生
+ * 
+ * 使用事务批量插入，提高性能。使用INSERT OR IGNORE避免重复插入。
+ * 
+ * @param {{ studentId: string; name: string; class: string; password: string }[]} students - 学生信息数组
+ * @returns {number} 添加的学生数量
+ */
 export function addStudentsBatch(students: { studentId: string; name: string; class: string; password: string }[]): number {
   const db = getDatabase();
   const insert = db.prepare('INSERT OR IGNORE INTO students (student_id, name, class, password) VALUES (?, ?, ?, ?)');
@@ -347,6 +465,13 @@ export function addStudentsBatch(students: { studentId: string; name: string; cl
   return students.length;
 }
 
+/**
+ * 更新学生信息
+ * 
+ * @param {number} id - 学生记录ID
+ * @param {{ studentId?: string; name?: string; class?: string; password?: string }} data - 要更新的学生信息
+ * @returns {boolean} 更新是否成功
+ */
 export function updateStudent(id: number, data: { studentId?: string; name?: string; class?: string; password?: string }): boolean {
   const db = getDatabase();
   const fields: string[] = [];
@@ -364,20 +489,36 @@ export function updateStudent(id: number, data: { studentId?: string; name?: str
   return result.changes > 0;
 }
 
+/**
+ * 删除学生
+ * 
+ * @param {number} id - 学生记录ID
+ * @returns {boolean} 删除是否成功
+ */
 export function deleteStudent(id: number): boolean {
   const db = getDatabase();
   const result = db.prepare('DELETE FROM students WHERE id = ?').run(id);
   return result.changes > 0;
 }
 
+/**
+ * 验证学生登录
+ * 
+ * @param {string} studentId - 学生学号
+ * @param {string} password - 密码
+ * @returns {Student | null} 验证成功返回学生信息，失败返回null
+ */
 export function validateStudentLogin(studentId: string, password: string): Student | null {
   const db = getDatabase();
   const row = db.prepare('SELECT id, student_id as studentId, name, class, password, created_at as createdAt FROM students WHERE student_id = ? AND password = ?').get(studentId, password) as Student | undefined;
   return row || null;
 }
 
-/* ========== 学情记录操作 ========== */
+/* ========== 学情记录操作模块 ========== */
 
+/**
+ * 学情评价记录接口定义
+ */
 export interface EvaluationRecord {
   id: number;
   studentId: string;
@@ -388,16 +529,33 @@ export interface EvaluationRecord {
   createdAt: string;
 }
 
+/**
+ * 获取所有学情评价记录
+ * 
+ * @returns {EvaluationRecord[]} 评价记录数组
+ */
 export function getEvaluations(): EvaluationRecord[] {
   const db = getDatabase();
   return db.prepare('SELECT id, student_id as studentId, question, code, report, score, created_at as createdAt FROM evaluations ORDER BY created_at DESC').all() as EvaluationRecord[];
 }
 
+/**
+ * 获取指定学生的学情评价记录
+ * 
+ * @param {string} studentId - 学生学号
+ * @returns {EvaluationRecord[]} 该学生的评价记录数组
+ */
 export function getStudentEvaluations(studentId: string): EvaluationRecord[] {
   const db = getDatabase();
   return db.prepare('SELECT id, student_id as studentId, question, code, report, score, created_at as createdAt FROM evaluations WHERE student_id = ? ORDER BY created_at DESC').all(studentId) as EvaluationRecord[];
 }
 
+/**
+ * 添加学情评价记录
+ * 
+ * @param {{ studentId: string; question: string; code: string; report: string; score: number }} record - 评价记录数据
+ * @returns {EvaluationRecord} 添加后的评价记录对象
+ */
 export function addEvaluation(record: { studentId: string; question: string; code: string; report: string; score: number }): EvaluationRecord {
   const db = getDatabase();
   const result = db.prepare('INSERT INTO evaluations (student_id, question, code, report, score) VALUES (?, ?, ?, ?, ?)').run(record.studentId, record.question, record.code, record.report, record.score);
@@ -408,6 +566,13 @@ export function addEvaluation(record: { studentId: string; question: string; cod
   };
 }
 
+/**
+ * 更新学情评价记录
+ * 
+ * @param {number} id - 评价记录ID
+ * @param {{ question?: string; code?: string; report?: string; score?: number }} data - 要更新的评价数据
+ * @returns {boolean} 更新是否成功
+ */
 export function updateEvaluation(id: number, data: { question?: string; code?: string; report?: string; score?: number }): boolean {
   const db = getDatabase();
   const fields: string[] = [];
@@ -425,14 +590,23 @@ export function updateEvaluation(id: number, data: { question?: string; code?: s
   return result.changes > 0;
 }
 
+/**
+ * 删除学情评价记录
+ * 
+ * @param {number} id - 评价记录ID
+ * @returns {boolean} 删除是否成功
+ */
 export function deleteEvaluation(id: number): boolean {
   const db = getDatabase();
   const result = db.prepare('DELETE FROM evaluations WHERE id = ?').run(id);
   return result.changes > 0;
 }
 
-/* ========== 题库操作 ========== */
+/* ========== 题库操作模块 ========== */
 
+/**
+ * 题库题目接口定义
+ */
 export interface QuestionItem {
   id: number;
   title: string;
@@ -441,11 +615,22 @@ export interface QuestionItem {
   exampleCode: string;
 }
 
+/**
+ * 获取题库列表
+ * 
+ * @returns {QuestionItem[]} 题目列表数组
+ */
 export function getQuestions(): QuestionItem[] {
   const db = getDatabase();
   return db.prepare('SELECT id, title, content, hint, example_code as exampleCode FROM questions ORDER BY id DESC').all() as QuestionItem[];
 }
 
+/**
+ * 添加新题目
+ * 
+ * @param {{ title: string; content: string; hint: string; exampleCode: string }} question - 题目数据
+ * @returns {QuestionItem} 添加后的题目对象
+ */
 export function addQuestion(question: { title: string; content: string; hint: string; exampleCode: string }): QuestionItem {
   const db = getDatabase();
   const result = db.prepare('INSERT INTO questions (title, content, hint, example_code) VALUES (?, ?, ?, ?)').run(question.title, question.content, question.hint, question.exampleCode);
@@ -455,6 +640,13 @@ export function addQuestion(question: { title: string; content: string; hint: st
   };
 }
 
+/**
+ * 更新题目信息
+ * 
+ * @param {number} id - 题目ID
+ * @param {{ title?: string; content?: string; hint?: string; exampleCode?: string }} data - 要更新的题目信息
+ * @returns {boolean} 更新是否成功
+ */
 export function updateQuestion(id: number, data: { title?: string; content?: string; hint?: string; exampleCode?: string }): boolean {
   const db = getDatabase();
   const fields: string[] = [];
@@ -472,14 +664,23 @@ export function updateQuestion(id: number, data: { title?: string; content?: str
   return result.changes > 0;
 }
 
+/**
+ * 删除题目
+ * 
+ * @param {number} id - 题目ID
+ * @returns {boolean} 删除是否成功
+ */
 export function deleteQuestion(id: number): boolean {
   const db = getDatabase();
   const result = db.prepare('DELETE FROM questions WHERE id = ?').run(id);
   return result.changes > 0;
 }
 
-/* ========== Session操作 ========== */
+/* ========== Session操作模块 ========== */
 
+/**
+ * 会话信息接口定义
+ */
 export interface Session {
   id: number;
   sessionId: string;
@@ -488,6 +689,13 @@ export interface Session {
   createdAt: string;
 }
 
+/**
+ * 创建用户会话
+ * 
+ * @param {'admin' | 'student'} userType - 用户类型
+ * @param {string} userId - 用户ID
+ * @returns {string} 创建的sessionId
+ */
 export function createSession(userType: 'admin' | 'student', userId: string): string {
   const db = getDatabase();
   const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -495,18 +703,35 @@ export function createSession(userType: 'admin' | 'student', userId: string): st
   return sessionId;
 }
 
+/**
+ * 获取会话信息
+ * 
+ * @param {string} sessionId - 会话ID
+ * @returns {Session | null} 会话信息，若无则返回null
+ */
 export function getSession(sessionId: string): Session | null {
   const db = getDatabase();
   const row = db.prepare('SELECT id, session_id as sessionId, user_type as userType, user_id as userId, created_at as createdAt FROM sessions WHERE session_id = ?').get(sessionId) as Session | undefined;
   return row || null;
 }
 
+/**
+ * 删除会话
+ * 
+ * @param {string} sessionId - 会话ID
+ * @returns {boolean} 删除是否成功
+ */
 export function deleteSession(sessionId: string): boolean {
   const db = getDatabase();
   const result = db.prepare('DELETE FROM sessions WHERE session_id = ?').run(sessionId);
   return result.changes > 0;
 }
 
+/**
+ * 清理过期会话
+ * 
+ * 删除7天前创建的会话，防止数据库中积累过多过期会话。
+ */
 export function clearOldSessions(): void {
   const db = getDatabase();
   db.prepare('DELETE FROM sessions WHERE created_at < datetime("now", "-7 days", "localtime")').run();
@@ -514,17 +739,22 @@ export function clearOldSessions(): void {
 
 /**
  * 获取统计数据摘要
+ * 
+ * 统计所有评价记录的总数、平均分、各等级人数及优秀率。
+ * 
+ * @returns {{ totalCount: number; avgScore: number; excellentCount: number; goodCount: number; passCount: number; failCount: number; excellentRate: number }}
+ *          统计数据对象
  */
 export function getStatistics() {
   const db = getDatabase();
   const records = db.prepare(`
     SELECT 
       COUNT(*) as totalCount,
-      COALESCE(AVG(total_score), 0) as avgScore,
-      COALESCE(SUM(CASE WHEN total_score >= 85 THEN 1 ELSE 0 END), 0) as excellentCount,
-      COALESCE(SUM(CASE WHEN total_score >= 70 AND total_score < 85 THEN 1 ELSE 0 END), 0) as goodCount,
-      COALESCE(SUM(CASE WHEN total_score >= 60 AND total_score < 70 THEN 1 ELSE 0 END), 0) as passCount,
-      COALESCE(SUM(CASE WHEN total_score < 60 THEN 1 ELSE 0 END), 0) as failCount
+      COALESCE(AVG(score), 0) as avgScore,
+      COALESCE(SUM(CASE WHEN score >= 85 THEN 1 ELSE 0 END), 0) as excellentCount,
+      COALESCE(SUM(CASE WHEN score >= 70 AND score < 85 THEN 1 ELSE 0 END), 0) as goodCount,
+      COALESCE(SUM(CASE WHEN score >= 60 AND score < 70 THEN 1 ELSE 0 END), 0) as passCount,
+      COALESCE(SUM(CASE WHEN score < 60 THEN 1 ELSE 0 END), 0) as failCount
     FROM evaluations
   `).get() as any;
 
@@ -541,6 +771,10 @@ export function getStatistics() {
 
 /**
  * 获取所有评价记录（带学生姓名）
+ * 
+ * 关联查询评价记录和学生表，获取包含学生姓名和班级的完整记录。
+ * 
+ * @returns {any[]} 评价记录数组（包含学生姓名和班级信息）
  */
 export function getAllRecords() {
   const db = getDatabase();
@@ -558,6 +792,11 @@ export function getAllRecords() {
 
 /**
  * 搜索评价记录
+ * 
+ * 根据多个条件筛选评价记录，支持按学生姓名、班级、知识点、分数范围搜索。
+ * 
+ * @param {{ studentName?: string | null; studentClass?: string | null; knowledgePoint?: string | null; minScore?: number; maxScore?: number }} params - 搜索参数
+ * @returns {any[]} 符合条件的评价记录数组
  */
 export function searchRecords(params: {
   studentName?: string | null;
@@ -607,18 +846,24 @@ export function searchRecords(params: {
  */
 export function getKnowledgePointsStats() {
   const db = getDatabase();
-  const records = db.prepare('SELECT hint FROM evaluations').all() as { hint: string }[];
+  const records = db.prepare('SELECT report FROM evaluations').all() as { report: string }[];
   const kpCount: Record<string, number> = {};
 
-  records.forEach((record: { hint: string }) => {
-    if (record.hint) {
-      const words = record.hint.split(/[,，、；;]/).filter(w => w.trim().length > 0);
-      words.forEach(word => {
-        const cleanWord = word.trim();
-        if (cleanWord.length > 0) {
-          kpCount[cleanWord] = (kpCount[cleanWord] || 0) + 1;
-        }
-      });
+  records.forEach((record: { report: string }) => {
+    if (!record.report) return;
+    try {
+      const parsed = JSON.parse(record.report);
+      if (Array.isArray(parsed.knowledgePoints)) {
+        parsed.knowledgePoints.forEach((kp: string) => {
+          if (typeof kp !== 'string') return;
+          const cleanWord = kp.trim();
+          if (cleanWord.length > 0) {
+            kpCount[cleanWord] = (kpCount[cleanWord] || 0) + 1;
+          }
+        });
+      }
+    } catch {
+      // 忽略解析失败的记录
     }
   });
 
@@ -774,5 +1019,95 @@ export function deleteChatMessages(conversationId: string): boolean {
   const result = db
     .prepare('DELETE FROM chat_messages WHERE conversation_id = ?')
     .run(conversationId);
+  return result.changes > 0;
+}
+
+/* ========== 学习资源操作模块 ========== */
+
+/**
+ * 学习资源接口定义
+ */
+export interface LearningResource {
+  id: number;
+  title: string;
+  url: string;
+  description: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+/**
+ * 获取所有学习资源
+ */
+export function getLearningResources(): LearningResource[] {
+  const db = getDatabase();
+  return db
+    .prepare('SELECT id, title, url, description, sort_order as sortOrder, created_at as createdAt FROM learning_resources ORDER BY sort_order ASC, id ASC')
+    .all() as LearningResource[];
+}
+
+/**
+ * 添加学习资源
+ */
+export function addLearningResource(
+  resource: { title: string; url: string; description?: string; sortOrder?: number }
+): LearningResource {
+  const db = getDatabase();
+  const result = db
+    .prepare('INSERT INTO learning_resources (title, url, description, sort_order) VALUES (?, ?, ?, ?)')
+    .run(resource.title, resource.url, resource.description || '', resource.sortOrder || 0);
+  return {
+    id: result.lastInsertRowid as number,
+    title: resource.title,
+    url: resource.url,
+    description: resource.description || '',
+    sortOrder: resource.sortOrder || 0,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * 更新学习资源
+ */
+export function updateLearningResource(
+  id: number,
+  data: { title?: string; url?: string; description?: string; sortOrder?: number }
+): boolean {
+  const db = getDatabase();
+  const fields: string[] = [];
+  const values: (string | number)[] = [];
+
+  if (data.title !== undefined) {
+    fields.push('title = ?');
+    values.push(data.title);
+  }
+  if (data.url !== undefined) {
+    fields.push('url = ?');
+    values.push(data.url);
+  }
+  if (data.description !== undefined) {
+    fields.push('description = ?');
+    values.push(data.description);
+  }
+  if (data.sortOrder !== undefined) {
+    fields.push('sort_order = ?');
+    values.push(data.sortOrder);
+  }
+
+  if (fields.length === 0) {
+    return false;
+  }
+
+  values.push(id);
+  const result = db.prepare(`UPDATE learning_resources SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  return result.changes > 0;
+}
+
+/**
+ * 删除学习资源
+ */
+export function deleteLearningResource(id: number): boolean {
+  const db = getDatabase();
+  const result = db.prepare('DELETE FROM learning_resources WHERE id = ?').run(id);
   return result.changes > 0;
 }
