@@ -42,7 +42,7 @@ type TabType = 'students' | 'questions' | 'evaluations';
  * - 数据统计：班级级别数据统计分析
  * 
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function AdminPage() {

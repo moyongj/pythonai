@@ -120,7 +120,7 @@ const TEMPLATES: Array<{
  * - Markdown渲染支持，含代码高亮
  * 
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function ChatPage() {

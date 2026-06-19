@@ -1,3 +1,26 @@
+/**
+ * 代码评价API路由
+ * 
+ * 实现"码上成长"平台核心功能：对学生提交的Python代码进行AI智能评价。
+ * - 代码正确性分析：检查代码运行结果是否正确
+ * - 语法错误检查：检测常见的Python语法错误
+ * - 知识点匹配：自动识别代码中使用的Python知识点
+ * - 代码风格评价：评估代码的可读性和规范性
+ * - 综合评分：根据多维度分析结果自动生成分数
+ * - 学习建议：提供个性化学习建议
+ * 
+ * 评价流程：
+ * 1. 接收学生提交的题目和代码
+ * 2. 构造专业的提示词模板，调用AI大模型（OpenAI API）
+ * 3. 解析AI返回的结构化评价结果
+ * 4. 将评价记录持久化到数据库
+ * 5. 返回评价结果给前端展示
+ * 
+ * @module api/evaluate
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { addEvaluation } from '@/lib/db';

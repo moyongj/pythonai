@@ -1,3 +1,23 @@
+/**
+ * 代码运行API路由
+ * 
+ * 提供学生在浏览器中编写的Python代码的在线执行能力。
+ * - 自动检测Python可执行文件路径（兼容python3、python及不同服务器环境）
+ * - 限制代码执行时间，防止无限循环和长时间运行
+ * - 处理用户输入：支持交互式input()函数调用，过滤输入提示文本
+ * - 多编码支持：处理中文输出的UTF-8、GBK等编码解码问题
+ * - 捕获标准输出(stdout)和标准错误(stderr)
+ * 
+ * 安全设计：
+ * 1. 使用spawnSync代替shell执行，避免shell注入
+ * 2. 限制执行超时时间为10秒
+ * 3. 将代码写入临时文件后执行，减少字符串拼接风险
+ * 
+ * @module api/run-code
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextResponse } from 'next/server';
 import { spawnSync, execSync } from 'child_process';
 

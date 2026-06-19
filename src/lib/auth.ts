@@ -5,7 +5,7 @@
  * 通过API调用与后端数据库进行交互，实现完整的用户认证和数据管理流程。
  * 
  * @module auth
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 

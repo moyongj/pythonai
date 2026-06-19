@@ -44,7 +44,7 @@ type TabType = 'resources' | 'students' | 'questions' | 'evaluations';
  * - 删除资源
  *
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function AdminResourcesPage() {

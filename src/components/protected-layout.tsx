@@ -21,7 +21,7 @@ interface ProtectedLayoutProps {
  * 所有需要用户登录后才能访问的页面都应使用此布局。
  * 
  * @component
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  * 
  * @param {ProtectedLayoutProps} props - 组件属性

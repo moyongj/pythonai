@@ -1,8 +1,32 @@
+/**
+ * 学生管理API路由
+ * 
+ * 提供学生信息的增删改查功能，支持管理员维护学生数据。
+ * - GET：获取所有学生列表
+ * - POST：批量添加学生（支持一次导入多个学生）
+ * - PUT：更新单个学生信息（学号、姓名、班级、密码）
+ * - DELETE：删除指定学生
+ * 
+ * 学生数据结构：
+ * - studentId：学号（唯一标识）
+ * - name：学生姓名
+ * - class：所在班级
+ * - password：登录密码
+ * 
+ * 批量导入使用事务处理，确保数据一致性，并通过INSERT OR IGNORE避免重复导入。
+ * 
+ * @module api/students
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextResponse } from 'next/server';
 import { getStudents, addStudentsBatch, updateStudent, deleteStudent } from '@/lib/db';
 
 /**
  * 获取学生列表
+ * 
+ * @returns {NextResponse} 学生列表响应，包含所有学生的基本信息
  */
 export async function GET() {
   try {

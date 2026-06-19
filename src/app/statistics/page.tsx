@@ -436,7 +436,7 @@ function generateMockData(evaluations: EvaluationRecord[], students: Student[]):
  * - 数据导出功能（CSV格式）
  * 
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function StatisticsPage() {

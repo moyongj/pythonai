@@ -48,7 +48,7 @@ const NAV_ITEMS = [
  * - 移动端响应式菜单
  * 
  * @component
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export function Header() {

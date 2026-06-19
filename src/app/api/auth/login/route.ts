@@ -4,7 +4,7 @@
  * 处理管理员和学生的登录请求，验证用户身份并创建会话。
  * 
  * @module api/auth/login
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 

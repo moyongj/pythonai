@@ -29,7 +29,7 @@ const ANSWER_PASSWORD = 'mlszs';
  * - 一键填充到评价页面功能
  * 
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function PracticePage() {

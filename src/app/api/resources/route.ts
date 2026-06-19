@@ -1,8 +1,30 @@
+/**
+ * 学习资源管理API路由
+ * 
+ * 提供学习资源的增删改查功能，用于管理平台推荐的Python学习资源链接。
+ * - GET：获取所有学习资源列表
+ * - POST：添加新学习资源（包含标题、链接、描述、排序等）
+ * - PUT：更新现有学习资源信息
+ * - DELETE：删除指定学习资源
+ * 
+ * 学习资源数据结构：
+ * - title：资源标题
+ * - url：资源外部链接
+ * - description：资源描述
+ * - sortOrder：排序顺序，数字越小越靠前
+ * 
+ * @module api/resources
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextResponse } from 'next/server';
 import { getLearningResources, addLearningResource, updateLearningResource, deleteLearningResource } from '@/lib/db';
 
 /**
  * 获取学习资源列表
+ * 
+ * @returns {NextResponse} 学习资源列表响应，按sortOrder升序排序
  */
 export async function GET() {
   try {

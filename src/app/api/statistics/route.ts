@@ -1,3 +1,23 @@
+/**
+ * 学情统计API路由
+ * 
+ * 提供学情数据的统计分析和导出功能，支持管理员查看班级整体学习情况。
+ * - GET：获取学情统计摘要，包含总提交数、平均分、各等级人数、优秀率
+ * - POST：根据条件搜索和筛选学情记录（支持学生姓名、班级、知识点、分数范围）
+ * - /download：支持将学情记录导出为Excel格式，便于老师离线分析
+ * 
+ * 统计功能：
+ * 1. 总提交次数统计
+ * 2. 平均分计算
+ * 3. 优秀/良好/及格/不及格人数分布
+ * 4. 知识点频次统计（根据AI评价报告自动提取）
+ * 5. 学生信息汇总（去重后的学生列表）
+ * 
+ * @module api/statistics
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextResponse } from 'next/server';
 import { getStatistics, getAllRecords, getKnowledgePointsStats, searchRecords, getAllStudentNames } from '@/lib/db';
 import * as XLSX from 'xlsx';

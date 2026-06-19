@@ -114,7 +114,7 @@ function levelToBadgeClass(level: string): string {
  * 包含评价表单、评价结果展示、个性化学习建议等功能。
  * 
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function EvaluatePage() {

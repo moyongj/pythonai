@@ -23,7 +23,7 @@ import { ProtectedLayout } from '@/components/protected-layout';
  * - 提供资源描述和外部链接
  *
  * @page
- * @author 码上成长项目组
+ * @author MYJ
  * @version 1.0.0
  */
 export default function ResourcesPage() {

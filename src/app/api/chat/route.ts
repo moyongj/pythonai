@@ -1,3 +1,23 @@
+/**
+ * AI聊天API路由
+ * 
+ * 实现"码上成长"平台的AI解惑功能，提供学生与AI的对话交互能力。
+ * - 创建会话：学生可以发起新的对话
+ * - 获取会话列表：查看历史对话
+ * - 删除会话：清理不需要的对话
+ * - 发送消息：与AI助手进行实时对话（基于OpenAI API）
+ * - 消息存储：持久化用户和AI的消息历史
+ * 
+ * AI助手限制：
+ * 1. 只回答Python编程相关问题
+ * 2. 不直接给出完整代码答案，采用引导式教学
+ * 3. 使用通俗易懂的语言，适合15-18岁学生
+ * 
+ * @module api/chat
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import {

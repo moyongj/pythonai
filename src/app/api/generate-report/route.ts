@@ -1,3 +1,22 @@
+/**
+ * 学情分析报告API路由
+ * 
+ * 基于学生的历史评价记录，利用AI大模型生成个性化的学情分析报告。
+ * - POST：接收学生的历史代码评价记录，调用OpenAI API生成分析报告
+ * - 报告包含：学习总结、优势亮点、薄弱环节、改进建议、后续学习规划
+ * 
+ * 报告生成流程：
+ * 1. 接收学生信息和历史评价数据
+ * 2. 构造专业的学情分析提示词
+ * 3. 调用AI大模型获取结构化分析结果
+ * 4. 将Markdown格式报告转换为HTML以便在前端展示
+ * 5. 返回完整的分析报告给前端
+ * 
+ * @module api/generate-report
+ * @author MYJ
+ * @version 1.0.0
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
