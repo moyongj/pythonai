@@ -139,10 +139,20 @@ export default function ChatPage() {
   const [templateVars, setTemplateVars] = useState<Record<string, string>>({});
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    setSidebarOpen(false);
+    const checkScreen = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+    checkScreen();
+    window.addEventListener('resize', checkScreen);
+    return () => window.removeEventListener('resize', checkScreen);
   }, []);
 
   /**
@@ -525,12 +535,12 @@ export default function ChatPage() {
       {/* 左侧会话列表 - 桌面端 */}
       <div
         className={cn(
-          'hidden lg:flex-shrink-0 lg:border-r lg:border-border lg:bg-card lg:transition-all lg:duration-300',
-          sidebarOpen ? 'lg:w-72' : 'lg:w-0'
+          'hidden lg:flex lg:flex-shrink-0 lg:border-r lg:border-border lg:bg-card lg:transition-all lg:duration-300 overflow-hidden',
+          sidebarOpen ? 'lg:w-72' : 'lg:w-0 lg:border-r-0'
         )}
       >
-        <div className="flex h-full flex-col">
-          <div className="border-b border-border p-3">
+        <div className="flex h-full w-full flex-col overflow-hidden">
+          <div className="flex-shrink-0 border-b border-border p-3">
             <button
               onClick={handleNewConversation}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
@@ -574,13 +584,13 @@ export default function ChatPage() {
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="flex-1 rounded border border-border bg-background px-1 text-sm"
+                        className="flex-1 min-w-0 rounded border border-border bg-background px-1 text-sm"
                         autoFocus
                       />
                     ) : (
                       <span className="flex-1 truncate text-sm">{conv.title}</span>
                     )}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 flex-shrink-0">
                       {editingTitleId === conv.conversationId ? (
                         <>
                           <button
@@ -633,17 +643,17 @@ export default function ChatPage() {
 
       {/* 移动端侧边栏按钮 */}
       <button
-        onClick={() => setSidebarOpen(true)}
-        className={`fixed bottom-20 left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg lg:hidden transition-all ${sidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        onClick={() => setMobileSidebarOpen(true)}
+        className={`fixed bottom-20 left-4 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg lg:hidden transition-all ${mobileSidebarOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
       >
         <MessageSquare className="h-5 w-5" />
       </button>
 
       {/* 移动端侧边栏遮罩 */}
-      {sidebarOpen && (
+      {mobileSidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
@@ -651,14 +661,14 @@ export default function ChatPage() {
       <div
         className={cn(
           'fixed left-0 top-0 z-50 h-full w-72 transform border-r border-border bg-card transition-transform duration-300 lg:hidden',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-border p-4">
             <h2 className="text-sm font-semibold text-foreground">对话列表</h2>
             <button
-              onClick={() => setSidebarOpen(false)}
+              onClick={() => setMobileSidebarOpen(false)}
               className="rounded p-1 hover:bg-muted"
             >
               <X className="h-5 w-5" />
@@ -668,7 +678,7 @@ export default function ChatPage() {
             <button
               onClick={() => {
                 handleNewConversation();
-                setSidebarOpen(false);
+                setMobileSidebarOpen(false);
               }}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90"
             >
@@ -691,7 +701,7 @@ export default function ChatPage() {
                     key={conv.conversationId}
                     onClick={() => {
                       setActiveConversationId(conv.conversationId);
-                      setSidebarOpen(false);
+                      setMobileSidebarOpen(false);
                     }}
                     className={cn(
                       'group flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 transition-all',
@@ -715,9 +725,19 @@ export default function ChatPage() {
         {/* 顶部工具栏 */}
         <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2 sm:px-4 sm:py-2.5">
           <div className="flex items-center gap-2">
+            {/* 移动端按钮：控制 mobileSidebarOpen */}
+            <button
+              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+              className="rounded p-1.5 hover:bg-muted lg:hidden"
+            >
+              <ChevronLeft
+                className={cn('h-4 w-4 transition-transform', !mobileSidebarOpen && 'rotate-180')}
+              />
+            </button>
+            {/* 桌面端按钮：控制 sidebarOpen */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="rounded p-1.5 hover:bg-muted lg:hidden"
+              className="hidden rounded p-1.5 hover:bg-muted lg:inline-flex"
             >
               <ChevronLeft
                 className={cn('h-4 w-4 transition-transform', !sidebarOpen && 'rotate-180')}
