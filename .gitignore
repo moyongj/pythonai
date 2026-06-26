@@ -162,3 +162,6 @@ Desktop.ini
 
 # Database files
 data/
+
+# Windows special files
+nul

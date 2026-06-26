@@ -28,6 +28,7 @@ import {
   deleteLearningResource,
   type LearningResource,
 } from '@/lib/auth';
+import { Footer } from '@/components/footer';
 
 /**
  * 标签页类型枚举
@@ -173,7 +174,7 @@ export default function AdminResourcesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
@@ -508,6 +509,7 @@ export default function AdminResourcesPage() {
           </ul>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

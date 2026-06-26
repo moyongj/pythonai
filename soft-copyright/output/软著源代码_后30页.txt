@@ -1,0 +1,1567 @@
+软件名称：码上成长Python智能学习平台
+版本号：V1.0
+页码：第212页 至 第241页（共30页）
+每页行数：50行
+总行数：11141行（31个文件）
+============================================================
+
+-------------------- 第 212 页 --------------------
+            r.title,
+            r.score.toString(),
+            r.level,
+            r.time,
+            r.knowledgePoints || ''
+          ])
+        );
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, className.slice(0, 31));
+      });
+
+      XLSX.writeFile(workbook, generateFileName('按班级_学情记录') + '.xlsx');
+    } else if (exportTypeParam === 'student') {
+      const studentGroups = allRecords.reduce((groups, record) => {
+        const studentName = record.name || '未知学生';
+        if (!groups[studentName]) {
+          groups[studentName] = [];
+        }
+        groups[studentName].push(record);
+        return groups;
+      }, {} as Record<string, typeof allRecords>);
+
+      Object.entries(studentGroups).forEach(([studentName, records]) => {
+        const sheetData = [headers].concat(
+          records.map((r, idx) => [
+            (idx + 1).toString(),
+            r.name,
+            r.studentId,
+            r.class,
+            r.title,
+            r.score.toString(),
+            r.level,
+            r.time,
+            r.knowledgePoints || ''
+          ])
+        );
+        const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(workbook, worksheet, studentName.slice(0, 31));
+      });
+
+      XLSX.writeFile(workbook, generateFileName('按学生_学情记录') + '.xlsx');
+    } else {
+      const sheetData = [headers].concat(
+        allRecords.map((r, idx) => [
+          (idx + 1).toString(),
+          r.name,
+          r.studentId,
+          r.class,
+          r.title,
+          r.score.toString(),
+
+-------------------- 第 213 页 --------------------
+          r.level,
+          r.time,
+          r.knowledgePoints || ''
+        ])
+      );
+      const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, '全部记录');
+      XLSX.writeFile(workbook, generateFileName('全部学情记录') + '.xlsx');
+    }
+  };
+
+  /**
+   * 一键生成学情诊断报告（带平滑进度条动画）
+   */
+  const handleGenerateReport = async () => {
+    setGeneratingReport(true);
+    setReportProgress(0);
+
+    let currentProgress = 0;
+    let stopAnimation = false;
+
+    /**
+     * 平滑动画：每个80ms增长，直到达到目标值，进度始终为整数
+     */
+    const animateTo = (target: number, speed: number = 2) => {
+      return new Promise<void>((resolve) => {
+        const timer = setInterval(() => {
+          if (stopAnimation) {
+            clearInterval(timer);
+            resolve();
+            return;
+          }
+          currentProgress = Math.min(Math.round(currentProgress + speed), target);
+          setReportProgress(currentProgress);
+          if (currentProgress >= target) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 80);
+      });
+    };
+
+    try {
+      // 阶段1: 准备请求 (0 -> 25%)
+      await animateTo(25, 2);
+
+      // 阶段2: 发起API请求
+      const fetchPromise = fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+
+-------------------- 第 214 页 --------------------
+        body: JSON.stringify({
+          evaluations: filteredEvaluations,
+          students,
+          filters: searchFilters,
+        })
+      });
+
+      // 并行：等待请求响应的同时，进度条缓慢增长到 70%
+      const [response] = await Promise.all([
+        fetchPromise,
+        animateTo(70, 1)
+      ]);
+
+      if (!response.ok) {
+        throw new Error('生成报告失败');
+      }
+
+      // 阶段3: 处理响应数据 (70 -> 90%)
+      const blobPromise = response.blob();
+      await Promise.all([
+        blobPromise,
+        animateTo(90, 2)
+      ]);
+
+      const blob = await blobPromise;
+
+      // 阶段4: 触发下载 (90 -> 100%)
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Learning_Report_${new Date().toISOString().slice(0,10)}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      await animateTo(100, 3);
+      toast.success('学情诊断报告生成成功！');
+    } catch (error) {
+      console.error('生成报告失败:', error);
+      toast.error('生成报告失败，请稍后重试');
+    } finally {
+      stopAnimation = true;
+      setTimeout(() => {
+        setGeneratingReport(false);
+        setReportProgress(0);
+      }, 1000);
+    }
+  };
+
+
+-------------------- 第 215 页 --------------------
+  /**
+   * 导出单个易错知识点统计
+   */
+  const handleExportSingleKp = (kp: TopKpItem) => {
+    const csv = [['知识点名称', '出现次数'], [kp.name, kp.count.toString()]]
+      .map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = generateFileName(`易错知识点_${kp.name.slice(0, 10)}`);
+    link.click();
+  };
+
+  /**
+   * 导出全部易错知识点（包含详细测评记录）
+   */
+  const handleExportKp = () => {
+    const headers = ['序号', '学生姓名', '学号', '班级', '成绩', '评价时间', '易错知识点'];
+
+    const workbook = XLSX.utils.book_new();
+
+    const sheetData = [headers].concat(
+      filteredEvaluations.map((evalRecord, idx) => {
+        const student = students.find(s => s.studentId === evalRecord.studentId);
+        const studentName = student?.name || '未知';
+        const studentId = student?.studentId || '';
+        const className = student?.class || '';
+
+        let knowledgePoints = '';
+        try {
+          const report = typeof evalRecord.report === 'string' ? JSON.parse(evalRecord.report) : evalRecord.report;
+          if (report?.knowledgePoints && Array.isArray(report.knowledgePoints)) {
+            knowledgePoints = report.knowledgePoints.join('、');
+          }
+        } catch {
+          knowledgePoints = '';
+        }
+
+        return [
+          (idx + 1).toString(),
+          studentName,
+          studentId,
+          className,
+          evalRecord.score.toString(),
+          new Date(evalRecord.createdAt).toLocaleString('zh-CN'),
+          knowledgePoints
+        ];
+      })
+    );
+
+
+-------------------- 第 216 页 --------------------
+    const worksheet = XLSX.utils.aoa_to_sheet(sheetData);
+    XLSX.utils.book_append_sheet(workbook, worksheet, '易错知识点记录');
+    XLSX.writeFile(workbook, generateFileName('易错知识点测评记录') + '.xlsx');
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const maxCount = Math.max(...distribution.map((d) => d.count), 1);
+
+  const SUMMARY = [
+    { label: '总评价次数', value: summary.totalCount.toString(), suffix: '次', icon: Activity, bg: 'bg-primary/10', text: 'text-primary' },
+    { label: '平均分', value: summary.avgScore.toString(), suffix: '分', icon: Trophy, bg: 'bg-accent-yellow/15', text: 'text-amber-700' },
+    { label: '优秀率', value: summary.excellentRate.toString(), suffix: '%', icon: Star, bg: 'bg-accent-green/15', text: 'text-accent-green' },
+    { label: '易错知识点', value: summary.kpCount.toString(), suffix: '个', icon: Lightbulb, bg: 'bg-accent-pink/15', text: 'text-accent-pink' },
+  ];
+
+  const DIMENSIONS = [
+    { name: '题目理解与实现', score: dimensionStats.understanding, full: 30, ring: '#FFD166' },
+    { name: '逻辑思路', score: dimensionStats.logic, full: 25, ring: '#55C59D' },
+    { name: '代码可读性', score: dimensionStats.readability, full: 25, ring: '#5B6CFF' },
+    { name: '语法掌握', score: dimensionStats.syntax, full: 20, ring: '#FF7AB6' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary sm:w-6 sm:h-6" />
+              <span className="text-base font-bold text-foreground sm:text-lg">管理员后台</span>
+            </div>
+            <nav className="hidden md:flex items-center gap-1 sm:gap-2">
+              <button onClick={() => router.push('/admin?tab=students')} className={cn(
+                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:py-2 sm:text-sm',
+                'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}>
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                学生管理
+              </button>
+              <button onClick={() => router.push('/admin?tab=questions')} className={cn(
+                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:py-2 sm:text-sm',
+                'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}>
+
+-------------------- 第 217 页 --------------------
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                题库管理
+              </button>
+              <button onClick={() => router.push('/admin?tab=evaluations')} className={cn(
+                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:py-2 sm:text-sm',
+                'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}>
+                <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                学情记录
+              </button>
+              <button className={cn(
+                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium sm:px-3 sm:py-2 sm:text-sm',
+                'bg-primary text-primary-foreground'
+              )}>
+                <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                学情分析
+              </button>
+              <a href="/admin/resources" className={cn(
+                'flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors sm:px-3 sm:py-2 sm:text-sm',
+                'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}>
+                <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                学习资源
+              </a>
+            </nav>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              className="flex items-center justify-center rounded-lg p-2 text-muted-foreground md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:px-3 sm:py-2 sm:text-sm"
+            >
+              <LogOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              退出
+            </button>
+          </div>
+        </div>
+        {/* 移动端导航菜单 */}
+        {mobileMenuOpen && (
+          <nav className="md:hidden border-t border-border bg-card px-4 py-2 space-y-1">
+            <button onClick={() => { router.push('/admin?tab=students'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">
+              <Users className="w-4 h-4" />
+              学生管理
+            </button>
+            <button onClick={() => { router.push('/admin?tab=questions'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">
+
+-------------------- 第 218 页 --------------------
+              <FileText className="w-4 h-4" />
+              题库管理
+            </button>
+            <button onClick={() => { router.push('/admin?tab=evaluations'); setMobileMenuOpen(false); }} className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">
+              <BarChart3 className="w-4 h-4" />
+              学情记录
+            </button>
+            <button onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium bg-primary/10 text-primary">
+              <TrendingUp className="w-4 h-4" />
+              学情分析
+            </button>
+            <a href="/admin/resources" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted">
+              <BookOpen className="w-4 h-4" />
+              学习资源
+            </a>
+          </nav>
+        )}
+      </header>
+
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-bold text-foreground sm:text-xl md:text-2xl">学情统计</h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-sm">所有学生的学习数据分析汇总</p>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className={cn(
+                'flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors sm:px-4 sm:py-2 sm:text-sm',
+                showSearch
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-foreground hover:bg-muted/80'
+              )}
+            >
+              <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              {showSearch ? '隐藏搜索' : '搜索筛选'}
+            </button>
+            <button
+              onClick={() => handleGenerateReport()}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-float transition-all hover:opacity-90 sm:px-4 sm:py-2 sm:text-sm"
+            >
+              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              一键生成学情诊断报告
+            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => handleExport('all')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent-green px-3 py-1.5 text-xs font-semibold text-white shadow-float transition-all hover:opacity-90 sm:px-4 sm:py-2 sm:text-sm"
+              >
+
+-------------------- 第 219 页 --------------------
+                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                导出全部
+              </button>
+              <button
+                onClick={() => handleExport('class')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted sm:px-4 sm:py-2 sm:text-sm"
+              >
+                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                按班级导出
+              </button>
+              <button
+                onClick={() => handleExport('student')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted sm:px-4 sm:py-2 sm:text-sm"
+              >
+                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                按学生导出
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {showSearch && (
+          <div className="rounded-xl bg-card p-4 shadow-card sm:p-5">
+            <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground sm:mb-4 sm:text-base">
+              <Search className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
+              搜索筛选
+            </h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground sm:text-sm">学生姓名</label>
+                <input
+                  type="text"
+                  value={searchFilters.studentName}
+                  onChange={(e) => setSearchFilters({ ...searchFilters, studentName: e.target.value })}
+                  placeholder="输入学生姓名"
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:px-3 sm:py-2 sm:text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground sm:text-sm">班级</label>
+                <select
+                  value={searchFilters.className}
+                  onChange={(e) => setSearchFilters({ ...searchFilters, className: e.target.value })}
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 sm:px-3 sm:py-2 sm:text-sm"
+                >
+                  <option value="">全部班级</option>
+                  {classes.map(cls => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </select>
+
+-------------------- 第 220 页 --------------------
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground sm:text-sm">最低分数</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={searchFilters.minScore}
+                  onChange={(e) => setSearchFilters({ ...searchFilters, minScore: e.target.value })}
+                  placeholder="0"
+                  className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 sm:px-3 sm:py-2 sm:text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-foreground sm:text-sm">最高分数</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={searchFilters.maxScore}
+                  onChange={(e) => setSearchFilters({ ...searchFilters, maxScore: e.target.value })}
+                  placeholder="100"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+            <div className="mt-3 flex items-center gap-2 sm:mt-4">
+              <button
+                onClick={handleSearch}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-float transition-all hover:opacity-90 sm:px-4 sm:py-2 sm:text-sm"
+              >
+                <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                搜索
+              </button>
+              <button
+                onClick={async () => {
+                  setSearchFilters({ studentName: '', className: '', minScore: '', maxScore: '' });
+                  const [evals, studentsData] = await Promise.all([getEvaluations(), getStudents()]);
+                  updateStats(evals, studentsData);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/80 sm:px-4 sm:py-2 sm:text-sm"
+              >
+                <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                清除
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+
+-------------------- 第 221 页 --------------------
+          {SUMMARY.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div key={item.label} className="flex items-center gap-3 rounded-xl bg-card p-3 shadow-card transition-transform hover:-translate-y-0.5 sm:p-4 lg:p-5">
+                <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg sm:h-12 sm:w-12', item.bg)}>
+                  <Icon className={cn('h-5 w-5 sm:h-6 sm:w-6', item.text)} />
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">{item.label}</div>
+                  <div className="mt-0.5 flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-foreground sm:text-xl lg:text-2xl">{item.value}</span>
+                    <span className="text-xs text-muted-foreground">{item.suffix}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+          <div className="flex flex-col rounded-xl bg-card p-4 shadow-card lg:col-span-3 sm:p-5" style={{ minHeight: '280px' }}>
+            <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-foreground lg:mb-5 lg:text-base">
+              <BarChart3 className="h-3.5 w-3.5 text-primary sm:h-4 sm:w-4" />
+              成绩分布
+            </h3>
+            <div className="flex-1 flex items-end gap-2 sm:gap-4">
+              {distribution.map((bar) => {
+                const heightPct = maxCount > 0 ? (bar.count / maxCount) * 100 : 0;
+                return (
+                  <div key={bar.range} className="flex flex-1 flex-col items-center gap-2">
+                    <div className="text-xs font-semibold text-foreground">{bar.count}人</div>
+                    <div className="flex h-20 w-full items-end overflow-hidden rounded-t-md bg-muted sm:h-120">
+                      <div className={cn('w-full rounded-t-md transition-all', bar.color)} style={{ height: `${heightPct}%` }} />
+                    </div>
+                    <div className={cn('text-xs font-medium', bar.text)}>{bar.range}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-card p-4 shadow-card lg:col-span-2 sm:p-5">
+            <h3 className="mb-4 flex items-center justify-between text-sm font-semibold text-foreground lg:mb-5 lg:text-base">
+              <span className="flex items-center gap-1.5">
+                <Code className="h-3.5 w-3.5 text-accent-pink sm:h-4 sm:w-4" />
+                易错知识点 TOP 5
+              </span>
+              <button
+                onClick={() => handleExportKp()}
+                className="text-xs text-primary hover:underline sm:text-sm"
+
+-------------------- 第 222 页 --------------------
+              >
+                导出全部
+              </button>
+            </h3>
+            <div className="space-y-3 sm:space-y-4">
+              {topKp.map((kp, idx) => (
+                <div key={idx} className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary sm:h-5 sm:w-5">{idx + 1}</span>
+                    <span className="whitespace-pre-wrap break-all text-xs font-medium text-foreground sm:text-sm leading-relaxed">{kp.name}</span>
+                  </div>
+                  <div className="flex items-center gap-3 pt-0.5">
+                    <span className="text-xs font-semibold text-muted-foreground">{kp.count} 次</span>
+                    <button onClick={() => handleExportSingleKp(kp)} className="text-xs text-primary hover:underline">导出</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-card p-4 shadow-card sm:p-5">
+          <h3 className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-foreground lg:mb-5 lg:text-base">
+            <TrendingUp className="h-3.5 w-3.5 text-accent-green sm:h-4 sm:w-4" />
+            四维度平均得分
+          </h3>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {DIMENSIONS.map((dim) => (
+              <RingProgress key={dim.name} percent={(dim.score / dim.full) * 100} color={dim.ring} label={dim.name} value={`${dim.score} / ${dim.full}`} />
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-card p-5 shadow-card">
+          <h3 className="mb-5 flex items-center justify-between text-base font-semibold text-foreground">
+            <span className="flex items-center gap-1.5">
+              <Code className="h-4 w-4 text-primary" />
+              最近评价记录
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => handleExport('all')}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent-green px-3 py-1.5 text-xs font-semibold text-white shadow-float transition-all hover:opacity-90 sm:px-4 sm:py-2 sm:text-sm"
+              >
+                <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                导出全部
+              </button>
+              <button
+                onClick={() => handleExport('class')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted sm:px-4 sm:py-2 sm:text-sm"
+
+-------------------- 第 223 页 --------------------
+              >
+                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                按班级导出
+              </button>
+              <button
+                onClick={() => handleExport('student')}
+                className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted sm:px-4 sm:py-2 sm:text-sm"
+              >
+                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                按学生导出
+              </button>
+            </div>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2.5 pr-4">学生姓名</th>
+                  <th className="py-2.5 pr-4">班级</th>
+                  <th className="py-2.5 pr-4">题目</th>
+                  <th className="py-2.5 pr-4">总分</th>
+                  <th className="py-2.5 pr-4">等级</th>
+                  <th className="py-2.5">评价时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentRecords.length > 0 ? (
+                  recentRecords.map((rec) => (
+                    <tr key={rec.id} className="border-b border-border/50 last:border-0 hover:bg-muted/40 transition-colors">
+                      <td className="py-3 pr-4 text-foreground">{rec.name}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{rec.class}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{rec.title}</td>
+                      <td className="py-3 pr-4 font-bold text-foreground">{rec.score}</td>
+                      <td className="py-3 pr-4">
+                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold', levelBadgeClass(rec.level))}>
+                          {rec.level}
+                        </span>
+                      </td>
+                      <td className="py-3 text-muted-foreground">{rec.time}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">暂无评价记录</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-1">
+
+-------------------- 第 224 页 --------------------
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              const pageNum = totalPages <= 5 ? i + 1 :
+                currentPage <= 3 ? i + 1 :
+                currentPage >= totalPages - 2 ? totalPages - 4 + i :
+                currentPage - 2 + i;
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={cn(
+                    "min-w-8 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    currentPage === pageNum
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border bg-background text-foreground hover:bg-muted"
+                  )}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="mt-2 text-center text-xs text-muted-foreground">
+            第 {currentPage} / {totalPages} 页，共 {filteredEvaluations.length} 条记录
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-card p-5 shadow-card">
+          <h3 className="mb-5 flex items-center gap-1.5 text-base font-semibold text-foreground">
+            <Quote className="h-4 w-4 text-amber-700" />
+            知识点词云
+          </h3>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3 py-6">
+            {WORDCLOUD.map((w) => (
+              <span key={w.text} className={cn('cursor-default transition-transform hover:-translate-y-0.5', w.size, w.weight, w.color)}>
+                {w.text}
+              </span>
+
+-------------------- 第 225 页 --------------------
+            ))}
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-3 border-t border-border/50 pt-4 text-xs text-muted-foreground">
+            <Sparkles className="h-3 w-3" />
+            <span>字号代表知识点重要程度</span>
+          </div>
+        </div>
+      </div>
+
+      {generatingReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="rounded-2xl bg-white p-8 shadow-2xl max-w-md w-full mx-4">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-accent-purple/20">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent-purple">
+                  <FileText className="h-7 w-7 text-white animate-pulse" />
+                </div>
+              </div>
+
+              <h2 className="mb-2 text-xl font-bold text-foreground">
+                AI正在生成学情诊断报告
+              </h2>
+              <p className="mb-6 text-sm text-muted-foreground">
+                正在分析学习数据并生成个性化报告，请稍候...
+              </p>
+
+              <div className="w-full">
+                <div className="mb-2 flex justify-between text-xs font-medium text-muted-foreground">
+                  <span>处理进度</span>
+                  <span>{reportProgress}%</span>
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-accent-purple transition-all duration-500 ease-out"
+                    style={{ width: `${reportProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+                <span>{reportProgress < 30 ? '📊 正在分析学习数据' : reportProgress < 60 ? '📈 正在生成统计图表' : reportProgress < 90 ? '🤖 AI正在撰写分析建议' : '📄 正在导出报告文件'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <Footer />
+    </div>
+  );
+
+-------------------- 第 226 页 --------------------
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------- 第 227 页 --------------------
+// ========================================
+// 文件: src/app/layout.tsx
+// ========================================
+import type { Metadata } from 'next';
+import { Inspector } from 'react-dev-inspector';
+import { Nunito } from 'next/font/google';
+import './globals.css';
+import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
+
+const nunito = Nunito({
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '800'],
+  variable: '--font-nunito',
+  display: 'swap',
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: '码上成长 | Python代码智能评价与学情诊断AI智能体',
+    template: '%s | 码上成长',
+  },
+  description:
+    '码上成长是面向中职学生的 Python代码智能评价与学情诊断AI智能体，从题目理解、逻辑思路、代码可读性、语法掌握四个维度静态分析代码，生成评价报告与个性化练习。',
+  keywords: [
+    '码上成长',
+    'Python代码评价',
+    '学情诊断',
+    'AI教学',
+    '中职编程',
+    '代码智能评测',
+  ],
+  authors: [{ name: '码上成长 Team' }],
+  generator: '码上成长',
+  openGraph: {
+    title: '码上成长 | Python代码智能评价与学情诊断AI智能体',
+    description:
+      '从四大维度智能评价Python代码，定位易错知识点，生成个性化练习题，让每一次提交都成为成长的一步。',
+    siteName: '码上成长',
+    locale: 'zh_CN',
+    type: 'website',
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
+
+export default function RootLayout({
+  children,
+
+-------------------- 第 228 页 --------------------
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const isDev = process.env.COZE_PROJECT_ENV === 'DEV';
+
+  return (
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={`${nunito.variable} antialiased`}>
+        {isDev && <Inspector />}
+        {children}
+      </body>
+    </html>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------- 第 229 页 --------------------
+// ========================================
+// 文件: src/app/page.tsx
+// ========================================
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { LogIn, User, Lock, GraduationCap, ShieldCheck } from 'lucide-react';
+import { login, setSessionId, validateSession } from '@/lib/auth';
+import { cn } from '@/lib/utils';
+
+export default function Home() {
+  const router = useRouter();
+  const [loginType, setLoginType] = useState<'admin' | 'student'>('student');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const result = await validateSession();
+      if (result.success && result.userType) {
+        if (result.userType === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/practice');
+        }
+        return;
+      }
+      setCheckingSession(false);
+    };
+    checkSession();
+  }, [router]);
+
+  const handleLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    if (!username.trim() || !password.trim()) {
+      setError('请输入用户名和密码');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const result = await login(loginType, username, password);
+      if (result.success && result.sessionId) {
+        setSessionId(result.sessionId);
+
+-------------------- 第 230 页 --------------------
+        Promise.resolve().then(() => {
+          if (loginType === 'admin') {
+            router.push('/admin');
+          } else {
+            router.push('/evaluate');
+          }
+        });
+      } else {
+        setError(result.error || '登录失败，请检查账号密码');
+      }
+    } catch {
+      setError('登录失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent-green/5">
+      <div className="w-full max-w-md mx-4">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-4">
+            <GraduationCap className="w-8 h-8 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">码上成长</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Python代码智能评价与学情诊断AI智能体
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-card shadow-card p-6">
+          <div className="flex gap-2 mb-6">
+            <button
+              onClick={() => setLoginType('student')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 rounded-lg py-3 text-sm font-medium transition-all',
+                loginType === 'student'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              <User className="w-4 h-4" />
+
+-------------------- 第 231 页 --------------------
+              学生登录
+            </button>
+            <button
+              onClick={() => setLoginType('admin')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 rounded-lg py-3 text-sm font-medium transition-all',
+                loginType === 'admin'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              管理员登录
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                {loginType === 'admin' ? '管理员账号' : '学号'}
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder={loginType === 'admin' ? '请输入管理员账号' : '请输入学号'}
+                  className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                密码
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="请输入密码"
+                  className="w-full rounded-lg border border-border bg-background pl-10 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+            </div>
+
+            {error && (
+
+-------------------- 第 232 页 --------------------
+              <div className="rounded-lg bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleLogin}
+              disabled={loading}
+              className={cn(
+                'w-full flex items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition-all',
+                loading
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                  : 'bg-primary text-primary-foreground hover:opacity-90'
+              )}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
+                  登录中...
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-4 h-4" />
+                  登录
+                </>
+              )}
+            </button>
+          </div>
+
+          {loginType === 'student' && (
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              学生账号由管理员导入，请联系管理员获取
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------- 第 233 页 --------------------
+// ========================================
+// 文件: src/app/robots.ts
+// ========================================
+import { MetadataRoute } from 'next';
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: ['/api/', '/_next/', '/static/'],
+    },
+  };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------- 第 234 页 --------------------
+// ========================================
+// 文件: src/components/footer.tsx
+// ========================================
+/**
+ * 页脚组件，显示应用名称和作者信息
+ */
+export function Footer() {
+  return (
+    <footer className="border-t border-border/40 bg-card/50 py-4">
+      <div className="mx-auto max-w-6xl px-6 text-center text-sm text-muted-foreground">
+        码上成长——Python代码智能评价与学情诊断AI智能体   By 墨老师
+      </div>
+    </footer>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------- 第 235 页 --------------------
+// ========================================
+// 文件: src/components/header.tsx
+// ========================================
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import { Code2, MessageSquareCode, BarChart3, LogOut, User, ShieldCheck, Sparkles, Menu, X, BookOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { validateSession, logout, type Student, type Admin } from '@/lib/auth';
+
+/**
+ * 导航菜单配置项
+ */
+const NAV_ITEMS = [
+  {
+    label: '试题演练',
+    href: '/practice',
+    icon: Code2,
+  },
+  {
+    label: '代码评价',
+    href: '/evaluate',
+    icon: MessageSquareCode,
+  },
+  {
+    label: 'AI解惑',
+    href: '/chat',
+    icon: Sparkles,
+  },
+  {
+    label: '学情统计',
+    href: '/statistics',
+    icon: BarChart3,
+  },
+  {
+    label: '学习资源',
+    href: '/resources',
+    icon: BookOpen,
+  },
+];
+
+/**
+ * Header组件
+ *
+ * 页面顶部导航栏组件，包含：
+ * - 应用Logo和名称
+ * - 导航菜单（试题演练、代码评价、AI解惑、学情统计、学习资源）
+ * - 用户信息显示和退出登录功能
+
+-------------------- 第 236 页 --------------------
+ * - 移动端响应式菜单
+ *
+ * @component
+ * @author MYJ
+ * @version 1.0.0
+ */
+export function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState<{ type: 'admin' | 'student'; user: Admin | Student } | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  /**
+   * 路径变化时验证session状态
+   *
+   * 监听路径变化，重新验证用户会话状态，更新当前用户信息。
+   */
+  useEffect(() => {
+    const checkSession = async () => {
+      const result = await validateSession();
+      if (result.success && result.userType && result.user) {
+        setCurrentUser({ type: result.userType, user: result.user });
+      } else {
+        setCurrentUser(null);
+      }
+    };
+    checkSession();
+  }, [pathname]);
+
+  /**
+   * 处理退出登录
+   *
+   * 调用logout函数清除会话，并重定向到登录页面。
+   */
+  const handleLogout = async () => {
+    await logout();
+    setMobileMenuOpen(false);
+    router.push('/login');
+  };
+
+  // 登录页和管理员后台不显示Header
+  if (pathname === '/login' || pathname === '/admin' || pathname.startsWith('/admin')) {
+    return null;
+  }
+
+  return (
+    <header className="sticky top-0 z-40 border-b border-border/40 bg-card/90 shadow-card backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+        {/* Logo区域 */}
+        <Link href="/" className="flex items-center gap-2">
+
+-------------------- 第 237 页 --------------------
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary shadow-float">
+            <Code2 className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-foreground sm:text-lg">码上成长</span>
+            <span className="hidden rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:inline-block">
+              Python代码智能评价与学情诊断AI智能体
+            </span>
+          </div>
+        </Link>
+
+        {/* 桌面端导航 */}
+        <div className="hidden items-center gap-4 md:flex">
+          {/* 导航链接 */}
+          <nav className="flex items-center gap-1">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* 用户信息和退出按钮 */}
+          {currentUser && (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5">
+                {currentUser.type === 'admin' ? (
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                ) : (
+                  <User className="w-4 h-4 text-primary" />
+                )}
+                <span className="text-sm font-medium text-foreground">
+
+-------------------- 第 238 页 --------------------
+                  {currentUser.type === 'admin'
+                    ? '管理员'
+                    : (currentUser.user as Student).name}
+                </span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <LogOut className="w-4 h-4" />
+                退出
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 移动端菜单按钮 */}
+        <button
+          className="flex items-center justify-center rounded-lg p-2 text-muted-foreground md:hidden"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+        >
+          {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+      </div>
+
+      {/* 移动端菜单 */}
+      {mobileMenuOpen && (
+        <div className="border-t border-border/40 bg-card md:hidden">
+          <div className="space-y-1 px-4 py-3">
+            {/* 导航链接 */}
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cn(
+                    'flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+
+-------------------- 第 239 页 --------------------
+                  {item.label}
+                </Link>
+              );
+            })}
+
+            {/* 用户信息和退出按钮 */}
+            {currentUser && (
+              <div className="mt-3 border-t border-border/40 pt-3">
+                <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-3">
+                  {currentUser.type === 'admin' ? (
+                    <ShieldCheck className="w-4 h-4 text-primary" />
+                  ) : (
+                    <User className="w-4 h-4 text-primary" />
+                  )}
+                  <span className="text-sm font-medium text-foreground">
+                    {currentUser.type === 'admin'
+                      ? '管理员'
+                      : (currentUser.user as Student).name}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="mt-2 flex items-center gap-2 w-full rounded-lg px-4 py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <LogOut className="w-4 h-4" />
+                  退出登录
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-------------------- 第 240 页 --------------------
+// ========================================
+// 文件: src/components/protected-layout.tsx
+// ========================================
+'use client';
+
+import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
+
+/**
+ * ProtectedLayout组件属性接口
+ */
+interface ProtectedLayoutProps {
+  children: React.ReactNode;
+}
+
+/**
+ * ProtectedLayout组件
+ *
+ * 受保护页面的布局组件，提供统一的页面结构：
+ * - Header：顶部导航栏
+ * - main：主内容区域（动态渲染子组件）
+ * - Footer：页脚
+ *
+ * 所有需要用户登录后才能访问的页面都应使用此布局。
+ *
+ * @component
+ * @author MYJ
+ * @version 1.0.0
+ *
+ * @param {ProtectedLayoutProps} props - 组件属性
+ * @param {React.ReactNode} props.children - 子组件内容
+ *
+ * @returns {JSX.Element} 布局组件
+ */
+export function ProtectedLayout({ children }: ProtectedLayoutProps) {
+  return (
+    <div className="flex min-h-screen flex-col bg-background">
+      <Header />
+      <main className="flex-1">{children}</main>
+      <Footer />
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+-------------------- 第 241 页 --------------------
+// ========================================
+// 文件: src/hooks/use-mobile.ts
+// ========================================
+import * as React from "react"
+
+const MOBILE_BREAKPOINT = 768
+
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+    mql.addEventListener("change", onChange)
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return !!isMobile
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
